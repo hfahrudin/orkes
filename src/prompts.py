@@ -9,17 +9,17 @@ class PromptHandler:
         self.system_prompt_template = system_prompt
         self.user_prompt_template = user_prompt  # Fixed variable assignment
         
-    def gen_messages(self, queries):
-        sys_message = {
+    def gen_messages(self, system_message: str, user_message: str) -> tuple:
+        sys_prompt = {
             "role" : "system",
-            "content" :self._format_prompt(self.system_prompt_template, queries['system'])
+            "content" :self._format_prompt(self.system_prompt_template, system_message)
         }
-        user_message = {
+        user_prompt = {
             "role" : "user",
-            "content" :self._format_prompt(self.user_prompt_template, queries['user'])
+            "content" :self._format_prompt(self.user_prompt_template, user_message)
         }
         
-        return sys_message, user_message
+        return sys_prompt, user_prompt
     
         
     def _format_prompt(self, template: str, values: dict) -> str:
@@ -34,14 +34,15 @@ class PromptHandler:
             str: The formatted prompt.
         """
 
-        # Check for missing placeholders
+        # Check for excesive params
         missing_keys = [key for key in values.keys() if f"{{{key}}}" not in template]
-        
         if missing_keys:
             raise ValueError(f"Unused keys in values dictionary: {', '.join(missing_keys)}")
 
-        # Return the formatted prompt
-        return template.format(**values)
+        try:
+            return template.format(**values)
+        except KeyError as e:
+            raise KeyError(f"Missing key: {e.args[0]}")
     
     def get_all_keys(self):
         return {
