@@ -7,7 +7,7 @@ import json
 class LLMInterface(ABC):
     """
     Abstract base class for LLM connections.
-    Defines methods to send, stream, and parse messages.
+    Defines methods to send, streams.
     """
 
     @abstractmethod
