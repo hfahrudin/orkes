@@ -2,7 +2,6 @@ import json
 from abc import ABC, abstractmethod
 from typing import Type
 from requests.models import Response
-import tiktoken
 
 
 class ResponseInterface:
@@ -60,7 +59,6 @@ class ResponseBuffer:
         self.headers= headers
         self.connection = connection
         self.llm_response = llm_response
-        self.tokenizer = tiktoken.encoding_for_model("gpt-4")
         self.eot_token = eot_token
 
     async def stream(self, response: Response, buffer_size=10):
@@ -104,6 +102,6 @@ class ResponseBuffer:
     #     return sum(len(word) for word in buffer) + len(buffer) - 1 >= buffer_size
     
     def _is_buffer_full(self, buffer, buffer_size):
-        text = "".join(buffer)
-        tokens = self.tokenizer.encode(text)
-        return  len(tokens) >= buffer_size
+        """Check if the buffer has reached the specified max length."""
+        #TODO: right now it is based on the number of chunks, it could be based on other advanced metrics
+        return  len(buffer) >= buffer_size
