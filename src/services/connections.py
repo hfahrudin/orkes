@@ -11,12 +11,12 @@ class LLMInterface(ABC):
     """
 
     @abstractmethod
-    def send_message(self) -> Response:
+    def send_message(self, message, **kwargs) -> Response:
         """Send a message and receive the full response."""
         pass
     
     @abstractmethod
-    def stream_message(self) -> Response:
+    def stream_message(self, message, **kwargs) -> Response:
         """Stream the response incrementally."""
         pass
 
@@ -28,7 +28,7 @@ class LLMInterface(ABC):
 
 
 class vLLMConnection(LLMInterface):
-    def __init__(self, url: str, headers: Optional[Dict[str, str]] = None):
+    def __init__(self, url: str, model_name = str, headers: Optional[Dict[str, str]] = None):
         self.url = url
         self.headers = headers if headers else {
             'Content-Type': 'application/json',
@@ -41,26 +41,27 @@ class vLLMConnection(LLMInterface):
             "presence_penalty": 0,
             "seed": 22
         }
+        self.model_name = model_name
 
-    def stream_message(self, message, model_name, end_point = "/v1/chat/completions", settings = None):
+    def stream_message(self, message, end_point = "/v1/chat/completions", settings = None):
         full_url = self.url + end_point
         payload = {
             "messages": message,
-            "model": model_name,
+            "model": self.model_name,
             "stream": True,
-            **(settings if settings else self.default_settings)
+            **(settings if settings else self.default_setting)
         }
         # Post request to the full URL with the payload
         response = requests.post(full_url, headers=self.headers, data=json.dumps(payload), stream=True)
         return response
 
-    def generate_message(self, message, model_name, end_point="/v1/chat/completions", settings=None):
+    def send_message(self, message, end_point="/v1/chat/completions", settings=None):
         full_url = self.url + end_point
         payload = {
             "messages": message,
-            "model": model_name,
+            "model": self.model_name,
             "stream": False,
-            **(settings if settings else self.default_settings)
+            **(settings if settings else self.default_setting)
         }
         # Post request to the full URL with the payload
         response = requests.post(full_url, headers=self.headers, data=json.dumps(payload))
