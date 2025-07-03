@@ -56,7 +56,7 @@ class Agent(AgentInterface):
         message = self.prompt_handler.gen_messages(queries, chat_history)
         response = self.llm_handler.send_message(message)
         response_json = response.json()
-        return response_json
+        return self.response_handler.parse_full_response(response_json)
 
     def stream(self, queries, chat_history=None, stream_buffer=False, client_connection=None):
         #TODO: Properly Implement Async for steamBuffer feature, the infrastructure should work. 

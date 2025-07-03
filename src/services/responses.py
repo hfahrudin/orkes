@@ -52,7 +52,7 @@ class ChatResponse(ResponseInterface):
 
     def parse_full_response(self, payload):
         #TODO try to parse vllm whole response
-        pass
+        return payload
 
 
 class StreamResponseBuffer:
