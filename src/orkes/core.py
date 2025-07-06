@@ -37,5 +37,9 @@ class Orkes:
 #     pass
 
 
-"belajar langchain/graph memory management"
-"Orkes need accept state as memory management"
+# TODO:
+# "belajar langchain/graph memory management"
+# "Orkes need accept state as memory management"
+# "fallback limitation avoiding unlimited loop"
+# "DAG based graph"
+# "sentinel object, allow multiple end and start -> need to have assertion"
