@@ -1,8 +1,8 @@
 from agents.core import AgentInterface
 from typing import Callable
-from orkes.utils import function_assertion, is_typeddict_class
-from orkes.unit import Node
-from typing import Dict, List
+from orkes.utils import function_assertion, is_typeddict_class, check_dict_values_type
+from orkes.unit import Node, ForwardEdge, ConditionalEdge
+from typing import Dict, Any
 
 
 # Sentinel constants
@@ -12,11 +12,10 @@ END = "__end__"
 class Orkes:
     def __init__(self, state):
         self.node_pools: Dict[str, Node] = {}
+        self.edge_pools: Dict[str, Any] = {}
         assert is_typeddict_class(state), "Expected a TypedDict class"
         self.state = state
         self._freeze = False
-        self.start_edge = []
-        self.end_edge = []
 
     def add_node(self, name: str, func: Callable):
         if self._freeze:
@@ -40,33 +39,41 @@ class Orkes:
         assert to_node_name in self.node_pools, f"To node '{to_node_name}' does not exist"
         to_node: Node = self.node_pools[to_node_name]
 
-        from_node.add_next(to_node)
+        edge = ForwardEdge(from_node, to_node)
+
+        self.edge_pools[edge.id] = edge
 
 
 
-    def add_conditional_edges(self, from_node_name, judge_func, to_node_name):
+    def add_conditional_edges(self, from_node_name: str, judge_func: Callable, condition: Dict):
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
         
         assert from_node_name in self.node_pools, f"From node '{from_node_name}' does not exist"
         from_node: Node = self.node_pools[from_node_name]
 
-        assert to_node_name in self.node_pools, f"To node '{to_node_name}' does not exist"
-        to_node: Node = self.node_pools[to_node_name]
 
         assert function_assertion(judge_func, type(self.state)), (
             f"No parameter of 'judge funciton' has type matching of Graph State({type(self.state)})."
         )
-        pass
+
+        assert check_dict_values_type(condition, Node), "Not all values in condition are Node instances"
+
+        edge = ConditionalEdge(from_node, judge_func, condition)
+
+        self.edge_pools[edge.id] = edge
 
     def run(self, query):
         if not self._freeze:
             raise RuntimeError("Can only run after compile")
+        #TODO: Running Logic, How to map runtime, prolly using asyncio
         pass
 
     def compile(self):
         #check nodes need to have branch
         #check start point inttegrity
+        #check all conditional
+        #checkk all fallback
         #check end point integrity
         #check all function
         pass

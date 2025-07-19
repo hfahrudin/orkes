@@ -13,3 +13,7 @@ def function_assertion(func: Callable, expected_type: type) -> bool:
 
 def is_typeddict_class(obj) -> bool:
     return isinstance(obj, type) and issubclass(obj, dict) and hasattr(obj, '__annotations__') and getattr(obj, '__total__', None) is not None
+
+
+def check_dict_values_type(d: dict, cls: type) -> bool:
+    return all(isinstance(v, cls) for v in d.values())
