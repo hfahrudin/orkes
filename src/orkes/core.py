@@ -90,9 +90,12 @@ class Orkes:
 #     pass
 
 
-# TODO:
-# "belajar langchain/graph memory management"
-# "Orkes need accept state as memory management"
-# "fallback limitation avoiding unlimited loop"
-# "DAG based graph"
-# "sentinel object, allow multiple end and start -> need to have assertion"
+#Runner functions
+# 1. identify all edges
+# 2. encapsulate asyncio
+# 3. allow multiple end 
+# 4. allow multiple start
+# 5. accept multiple from and multiple to
+# basically any from to need to be list, so not necessarrly 1 to 1 but 1 to many can also
+# - it should have start and END edge
+# - belajar await
