@@ -99,3 +99,4 @@ class Orkes:
 # basically any from to need to be list, so not necessarrly 1 to 1 but 1 to many can also
 # - it should have start and END edge
 # - belajar await
+# 
