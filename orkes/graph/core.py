@@ -1,7 +1,7 @@
 from agents.core import AgentInterface
 from typing import Callable
-from orkes.utils import function_assertion, is_typeddict_class, check_dict_values_type
-from orkes.unit import Node, ForwardEdge, ConditionalEdge
+from graph.utils import function_assertion, is_typeddict_class, check_dict_values_type
+from graph.unit import Node, ForwardEdge, ConditionalEdge
 from typing import Dict, Any
 
 

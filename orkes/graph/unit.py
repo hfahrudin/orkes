@@ -1,6 +1,5 @@
 
-from typing import List, Dict
-from typing import Callable
+from typing import List, Dict, Callable
 import uuid
 
 class Node:
