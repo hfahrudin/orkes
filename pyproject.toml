@@ -1,0 +1,13 @@
+[project]
+name = "orkes"
+version = "0.0.5"
+description = "Lightweight multi-agent orchestration framework"
+readme = "README.md"
+requires-python = ">=3.10.12"
+license = {text = "MIT"}
+authors = [{ name="Hasby Fahrudin", email="your@email.com" }]
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

@@ -1,7 +1,7 @@
 from agents.core import AgentInterface
 from typing import Callable
-from graph.utils import function_assertion, is_typeddict_class, check_dict_values_type
-from graph.unit import Node, ForwardEdge, ConditionalEdge
+from orkes.graph.utils import function_assertion, is_typeddict_class, check_dict_values_type
+from orkes.graph.unit import Node, ForwardEdge, ConditionalEdge
 from typing import Dict, Any
 
 
@@ -9,7 +9,7 @@ from typing import Dict, Any
 START = "__start__"
 END = "__end__"
 
-class Orkes:
+class OrkesGraph:
     def __init__(self, state):
         self.node_pools: Dict[str, Node] = {}
         self.edge_pools: Dict[str, Any] = {}
