@@ -1,5 +1,5 @@
 
-from typing import List, Dict, Callable
+from typing import Any, Dict, Callable
 import uuid
 
 class Node:
@@ -12,15 +12,18 @@ class Node:
         - name (func): The unique identifier for the node.
         """
         self.name: str = name
-        self.func: str = func
+        self.func: Callable = func
 
+    def execute(self, state) -> Any:
+        output = self.func(state)
+        return output
 
     def __repr__(self) -> str:
         return f"Node({self.name})"
-
+    
 
 class ForwardEdge:
-    def __init__(self, from_node: "Node", to_node: "Node"):
+    def __init__(self, from_node: str, to_node: str, max_passes=5):
         """
         Initialize a ForwardEdge.
 
@@ -29,25 +32,39 @@ class ForwardEdge:
         - to_node (Node): The destination node of the edge.
         """
         self.id: str = str(uuid.uuid4())
-        self.origin: "Node" = from_node
-        self.dest: "Node" = to_node
+        self.origin: str = from_node
+        self.dest: str = to_node
+        self.passes = 0
+        self.max_passes = max_passes
 
+    def should_transfer(self, data: Any) -> bool:
+        self.passes +=1
+        return self.passes > self.max_passes
+    
     def __repr__(self) -> str:
-        return f"Node({self.id})"
+        return f"Edge({self.id})"
     
 class ConditionalEdge:
-    def __init__(self, from_node: "Node", judge_func: Callable, condition: Dict):
+    def __init__(self, from_node: str, judge_func: Callable, condition: Dict, max_passes=5):
         """
         Initialize a Node.
-
-        Parameters:
-        - name (str): The unique identifier for the node.
-        - name (func): The unique identifier for the node.
         """
         self.id: str = str(uuid.uuid4())
-        self.origin: "Node" = from_node
+        self.origin: str = from_node
         self.mapper: Callable = judge_func
         self.condition : Dict = condition
+        self.max_passes = max_passes
 
+    def should_transfer(self, data: Any) -> bool:
+        self.passes +=1
+        return self.condition(data) and self.passes > self.max_passes
+    
     def __repr__(self) -> str:
         return f"Node({self.id})"
+
+#RUnner constarain for now: support fallback, condtional, but no aggregator:
+# find Start Node:
+# mapper: { Node:node, "to_edges" : []}
+# was this edges conditional? if so what is the enxt edge
+# get the edge
+# each each propage:

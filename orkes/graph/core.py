@@ -11,11 +11,12 @@ END = "__end__"
 
 class OrkesGraph:
     def __init__(self, state):
-        self.node_pools: Dict[str, Node] = {}
+        self.node_pools: Dict[str, Any] = {}
         self.edge_pools: Dict[str, Any] = {}
         assert is_typeddict_class(state), "Expected a TypedDict class"
         self.state = state
         self._freeze = False
+        self.graph_mapper = {}
 
     def add_node(self, name: str, func: Callable):
         if self._freeze:
@@ -26,7 +27,7 @@ class OrkesGraph:
         assert function_assertion(func, type(self.state)), (
             f"No parameter of 'node' has type matching of Graph State({type(self.state)})."
         )
-        self.node_pools[name] = Node(name, func)
+        self.node_pools[name] = {"node" : Node(name, func), "edges" : []}
 
 
     def add_edge(self, from_node_name: str, to_node_name: str) -> None:
@@ -34,14 +35,14 @@ class OrkesGraph:
             raise RuntimeError("Cannot modify after compile")
         
         assert from_node_name in self.node_pools, f"From node '{from_node_name}' does not exist"
-        from_node: Node = self.node_pools[from_node_name]
 
         assert to_node_name in self.node_pools, f"To node '{to_node_name}' does not exist"
-        to_node: Node = self.node_pools[to_node_name]
 
-        edge = ForwardEdge(from_node, to_node)
+
+        edge = ForwardEdge(from_node_name, to_node_name)
 
         self.edge_pools[edge.id] = edge
+        self.node_pools[from_node_name].append(edge.id)
 
 
 
@@ -50,7 +51,6 @@ class OrkesGraph:
             raise RuntimeError("Cannot modify after compile")
         
         assert from_node_name in self.node_pools, f"From node '{from_node_name}' does not exist"
-        from_node: Node = self.node_pools[from_node_name]
 
 
         assert function_assertion(judge_func, type(self.state)), (
@@ -59,9 +59,10 @@ class OrkesGraph:
 
         assert check_dict_values_type(condition, Node), "Not all values in condition are Node instances"
 
-        edge = ConditionalEdge(from_node, judge_func, condition)
+        edge = ConditionalEdge(from_node_name, judge_func, condition)
 
         self.edge_pools[edge.id] = edge
+        self.node_pools[from_node_name].append(edge.id)
 
     def run(self, query):
         if not self._freeze:
@@ -76,6 +77,7 @@ class OrkesGraph:
         #checkk all fallback
         #check end point integrity
         #check all function
+        #should have all exit node
         pass
     
 
