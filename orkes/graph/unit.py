@@ -62,9 +62,10 @@ class ConditionalEdge:
     def __repr__(self) -> str:
         return f"Node({self.id})"
 
-#RUnner constarain for now: support fallback, condtional, but no aggregator:
+#RUnner constarain for now: support fallback, condtional, :
 # find Start Node:
 # mapper: { Node:node, "to_edges" : []}
 # was this edges conditional? if so what is the enxt edge
 # get the edge
 # each each propage:
+# agrogator is not per se nodeits totally different or phantom node for aggregation edge
