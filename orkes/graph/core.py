@@ -1,68 +1,117 @@
 from agents.core import AgentInterface
-from typing import Callable
+from typing import Callable, Union, Dict, Optional
 from orkes.graph.utils import function_assertion, is_typeddict_class, check_dict_values_type
-from orkes.graph.unit import Node, ForwardEdge, ConditionalEdge
-from typing import Dict, Any
+from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode
+from pydantic import BaseModel
 
 
-# Sentinel constants
-START = "__start__"
-END = "__end__"
+START = _StartNode()
+END = _EndNode()
+
+class NodePoolItem(BaseModel):
+    node: Node
+    edge: Optional[Edge] = None
 
 class OrkesGraph:
     def __init__(self, state):
-        self.node_pools: Dict[str, Any] = {}
-        self.edge_pools: Dict[str, Any] = {}
-        assert is_typeddict_class(state), "Expected a TypedDict class"
+        self.nodes_pool: Dict[str, NodePoolItem] = {
+            "START" : NodePoolItem(node=START),
+            "END" : NodePoolItem(node=END)
+        }
+        if not is_typeddict_class(state):
+            raise TypeError("Expected a TypedDict class")
         self.state = state
         self._freeze = False
-        self.graph_mapper = {}
 
     def add_node(self, name: str, func: Callable):
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
-        if name in self.node_pools:
+    
+        if name in self.nodes_pool:
             raise ValueError(f"Agent '{name}' already exists.")
 
-        assert function_assertion(func, type(self.state)), (
-            f"No parameter of 'node' has type matching of Graph State({type(self.state)})."
-        )
-        self.node_pools[name] = {"node" : Node(name, func), "edges" : []}
+        if not function_assertion(func, type(self.state)):
+            raise TypeError(
+                f"No parameter of 'node' has type matching Graph State ({type(self.state)})."
+            )
+        self.nodes_pool[name] = NodePoolItem(node=Node(name, func))
 
 
-    def add_edge(self, from_node_name: str, to_node_name: str) -> None:
+    def add_edge(self, from_node: Union[str, _StartNode], to_node: Union[str, _EndNode]) -> None:
+        if self._freeze:
+            raise RuntimeError("Cannot modify after compile")
+
+        from_node_item = self._validate_from_node(from_node)
+
+        to_node_item = self._validate_to_node(to_node)
+
+        edge = ForwardEdge(from_node_item, to_node_item)
+
+        self.nodes_pool[from_node_item.node.name].edge = edge
+
+    def add_conditional_edges(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, Union[str, Node]]):
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
         
-        assert from_node_name in self.node_pools, f"From node '{from_node_name}' does not exist"
+        from_node_item = self._validate_from_node(from_node)
 
-        assert to_node_name in self.node_pools, f"To node '{to_node_name}' does not exist"
+        if not function_assertion(gate_function, type(self.state)):
+            raise TypeError(
+                f"No parameter of 'gate_function' has type matching Graph State ({type(self.state)})."
+            )
 
+        self._validate_condition(condition)
 
-        edge = ForwardEdge(from_node_name, to_node_name)
+        edge = ConditionalEdge(from_node_item, gate_function, condition)
 
-        self.edge_pools[edge.id] = edge
-        self.node_pools[from_node_name].append(edge.id)
+        self.nodes_pool[from_node_item.node.name].edge = edge
 
+    def _validate_condition(self, condition: Dict[str, Union[str, Node]]):
+        for key, target in condition.items():
+            #if target is a string, it must be a registered node
+            if isinstance(target, str):
+                if target not in self.nodes_pool:
+                    raise ValueError(
+                        f"Condition branch '{key}' points to node '{target}', "
+                        f"but that node does not exist in the workflow."
+                    )
+            # if it's END or a Node object, allow it
+            elif isinstance(target, Node):
+                raise TypeError(
+                    f"Condition branch '{key}' must map to a str (node name), "
+                    f"a Node object, or END. Got {type(target).__name__}"
+                )
 
-
-    def add_conditional_edges(self, from_node_name: str, judge_func: Callable, condition: Dict):
+    def _validate_from_node(self, from_node: Union[str, _StartNode]):
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
         
-        assert from_node_name in self.node_pools, f"From node '{from_node_name}' does not exist"
+        if not (isinstance(from_node, str) or from_node is START):
+            raise TypeError(f"'from_node' must be str or START, got {type(from_node)}")
 
+        if isinstance(from_node, str):
+            if from_node not in self.nodes_pool:
+                raise ValueError(f"From node '{from_node}' does not exist")
+            from_node_item = self.nodes_pool[from_node]
+        else:
+            from_node_item = self.nodes_pool['START']
 
-        assert function_assertion(judge_func, type(self.state)), (
-            f"No parameter of 'judge funciton' has type matching of Graph State({type(self.state)})."
-        )
+        if from_node_item.edge is not None:
+            raise RuntimeError("Edge already assigned to this node.")
+        
+        return from_node_item
+    
+    def _validate_to_node(self, to_node: Union[str, _EndNode]):
+        if not (isinstance(to_node, str) or to_node is END):
+            raise TypeError(f"'to_node' must be str or END, got {type(to_node)}")
 
-        assert check_dict_values_type(condition, Node), "Not all values in condition are Node instances"
-
-        edge = ConditionalEdge(from_node_name, judge_func, condition)
-
-        self.edge_pools[edge.id] = edge
-        self.node_pools[from_node_name].append(edge.id)
+        if isinstance(to_node, str):
+            if to_node not in self.nodes_pool:
+                raise ValueError(f"To node '{to_node}' does not exist")
+            to_node_item = self.nodes_pool[to_node]
+        else:
+            to_node_item = self.nodes_pool['END']
+        return to_node_item
 
     def run(self, query):
         if not self._freeze:
@@ -78,6 +127,7 @@ class OrkesGraph:
         #check end point integrity
         #check all function
         #should have all exit node
+        #no loose end
         pass
     
 
@@ -92,13 +142,8 @@ class OrkesGraph:
 #     pass
 
 
-#Runner functions
-# 1. identify all edges
-# 2. encapsulate asyncio
-# 3. allow multiple end 
-# 4. allow multiple start
-# 5. accept multiple from and multiple to
-# basically any from to need to be list, so not necessarrly 1 to 1 but 1 to many can also
-# - it should have start and END edge
-# - belajar await
-# 
+#Graph feature:
+# DAG, able to cycle, sequential, conditional. 
+#Runner functions:
+#Notes:
+
