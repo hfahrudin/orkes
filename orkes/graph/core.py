@@ -144,6 +144,6 @@ class OrkesGraph:
 
 #Graph feature:
 # DAG, able to cycle, sequential, conditional. 
-#Runner functions:
+#Runner functions: TODO: gambar graph
 #Notes:
 
