@@ -1,10 +1,11 @@
 
-from typing import Any, Dict, Callable
+from typing import Any, Callable
 import uuid
 from abc import ABC, abstractmethod
+from orkes.graph.schema import NodePoolItem
 
 class Node:
-    def __init__(self, name: str, func: Callable):
+    def __init__(self, name: str, func: Callable, graph_state):
         """
         Initialize a Node.
 
@@ -14,14 +15,16 @@ class Node:
         """
         self.name: str = name
         self.func: Callable = func
+        self.graph_state = graph_state
 
-    def execute(self, state) -> Any:
-        output = self.func(state)
+    def execute(self) -> Any:
+        output = self.func(self.graph_state)
         return output
 
     def __repr__(self) -> str:
         return f"Node({self.name})"
 
+#TODO: add START NODE INVOKE initialitation
 class _StartNode(Node):
     """Special START node — entry point of the graph."""
     def __init__(self):
@@ -42,7 +45,7 @@ class _EndNode(Node):
         return state
 
 class Edge(ABC):
-    def __init__(self, from_node: Node, to_node: Node = None, max_passes=5):
+    def __init__(self, from_node: NodePoolItem, to_node: NodePoolItem = None, max_passes=5):
         self.id = str(uuid.uuid4())
         self.from_node = from_node
         self.to_node = to_node
@@ -63,8 +66,14 @@ class ForwardEdge(Edge):
         return self.passes <= self.max_passes
 
 class ConditionalEdge(Edge):
-    def __init__(self, from_node: str, judge_func: Callable, condition: Callable, max_passes=5):
-        super().__init__(from_node, None, max_passes)
+    def __init__(
+        self,
+        from_node: NodePoolItem,
+        judge_func: Callable,
+        condition: Callable,
+        max_passes=5
+    ):
+        super().__init__(from_node, to_node=None, max_passes=max_passes)  # initialize parent part
         self.judge_func = judge_func
         self.condition = condition
 

@@ -2,15 +2,12 @@ from agents.core import AgentInterface
 from typing import Callable, Union, Dict, Optional
 from orkes.graph.utils import function_assertion, is_typeddict_class, check_dict_values_type
 from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode
-from pydantic import BaseModel
+from orkes.graph.schema import NodePoolItem
 
 
 START = _StartNode()
 END = _EndNode()
 
-class NodePoolItem(BaseModel):
-    node: Node
-    edge: Optional[Edge] = None
 
 class OrkesGraph:
     def __init__(self, state):
@@ -116,7 +113,7 @@ class OrkesGraph:
     def run(self, query):
         if not self._freeze:
             raise RuntimeError("Can only run after compile")
-        #TODO: Running Logic, How to map runtime, prolly using asyncio
+
         pass
 
     def compile(self):
@@ -147,3 +144,9 @@ class OrkesGraph:
 #Runner functions: TODO: gambar graph
 #Notes:
 
+# # Graph state
+# class State(TypedDict):
+#     topic: str
+#     joke: str
+#     improved_joke: str
+#     final_joke: str
