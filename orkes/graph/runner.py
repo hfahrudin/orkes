@@ -27,7 +27,8 @@ class GraphRunner:
 
 
 
-# Handle Brancing and merging state -> because state update only happen after everything done, no shared mutable object
+# Handle Brancing and merging state -> because state update only happen after node process done, no shared mutable object
+# FAN IN FAN OUT STRATEGY, EVERY BRANCHING NODE NEED TO BE RETURNED
 # In your example:
 #     A
 #     |
