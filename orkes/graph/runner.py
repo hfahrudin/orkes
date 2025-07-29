@@ -2,20 +2,7 @@
 from typing import Callable, Any, Dict
 from orkes.graph.unit import Node,Edge
 from orkes.graph.schema import NodePoolItem
-class EdgeRunner:
-    def __init__(self, edge):
-        self.node = edge
 
-    def run(self, *args, **kwargs) -> Any:
-        """
-        Executes the node's function with given arguments.
-
-        Returns:
-        - The result of the node's function execution.
-        """
-        result =  self.node.func(*args, **kwargs)
-        return  result
-    
 class GraphRunner:
     def __init__(self, nodes_pool: Dict[str, NodePoolItem], graph_state):
         self.graph_state = graph_state
@@ -38,3 +25,30 @@ class GraphRunner:
         if current_edge.dest != END:
             self.tranverse_graph( current_node.dest, result)
 
+
+
+# Handle Brancing and merging state -> because state update only happen after everything done, no shared mutable object
+# In your example:
+#     A
+#     |
+#     B
+#    / \
+#   C   D
+#        \
+#         E
+# If E needs data from both C and D, you have two main options:
+
+# Make E a "merge node" that accepts inputs from both C and D — i.e., edges C -> E and D -> E.
+
+# E will receive two incoming states, merge them internally, then execute.
+
+# Insert an explicit merge node (e.g., M):
+
+#     C   D
+#      \ /
+#       M
+#       |
+#       E
+# The merge node M merges C and D’s outputs.
+
+# Then E runs with the combined state.

@@ -2,7 +2,7 @@ from orkes.services.connections import LLMInterface
 from orkes.services.prompts import PromptInterface
 from orkes.agents.actions import ActionBuilder
 from abc import ABC, abstractmethod
-from services.responses import ResponseInterface
+from orkes.services.responses import ResponseInterface
 from typing import Dict
 import json
 

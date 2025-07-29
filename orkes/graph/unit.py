@@ -61,9 +61,9 @@ class Edge(ABC):
         return f"{self.__class__.__name__}({self.id})"
 
 class ForwardEdge(Edge):
-    def should_transfer(self, data: Any) -> bool:
-        self.passes += 1
-        return self.passes <= self.max_passes
+    def __init__(self, from_node: NodePoolItem, to_node: NodePoolItem, max_passes: int = 5):
+        super().__init__(from_node, to_node, max_passes)
+        self.edge_type = "__forward__"
 
 class ConditionalEdge(Edge):
     def __init__(
@@ -76,6 +76,7 @@ class ConditionalEdge(Edge):
         super().__init__(from_node, to_node=None, max_passes=max_passes)  # initialize parent part
         self.judge_func = judge_func
         self.condition = condition
+        self.edge_type = "__conditional__"
 
     def should_transfer(self, data: Any) -> bool:
         self.passes += 1
