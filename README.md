@@ -5,8 +5,6 @@
 **Orkes** helps you coordinate LLM agents using plain Python.
 No magic, no unnecessary layers. Just **explicit control flow**, **transparent agent logic**, and **simple message passing**.
 
----
-
 ## 🔹 Core Principles
 
 * **Explicit control flow** — use DAGs, FSMs, or plain loops
@@ -16,8 +14,6 @@ No magic, no unnecessary layers. Just **explicit control flow**, **transparent a
 * **100% Pythonic** — easy to read, modify, and extend
 * **Stateless by default** — you control memory and state
 * **Hackable and debuggable** — nothing hidden
-
----
 
 ## 🛠️ Project Status
 
@@ -29,8 +25,6 @@ This is the initial stage of Orkes.
 * [ ] Minimal examples
 * [ ] Optional visualizer (planned)
 * [ ] Docs and tests (coming)
-
----
 
 ## License
 
