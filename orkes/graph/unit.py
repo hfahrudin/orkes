@@ -17,8 +17,8 @@ class Node:
         self.func: Callable = func
         self.graph_state = graph_state
 
-    def execute(self) -> Any:
-        output = self.func(self.graph_state)
+    def execute(self, input_state) -> Any:
+        output = self.func(input_state)
         return output
 
     def __repr__(self) -> str:
