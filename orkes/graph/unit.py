@@ -24,11 +24,12 @@ class Node:
     def __repr__(self) -> str:
         return f"Node({self.name})"
 
+
 #TODO: add START NODE INVOKE initialitation
 class _StartNode(Node):
     """Special START node — entry point of the graph."""
-    def __init__(self):
-        super().__init__("START", self._start)
+    def __init__(self, graph_state):
+        super().__init__("START", self._start, graph_state)
 
     def _start(self, state):
         # START usually just forwards state
@@ -37,8 +38,8 @@ class _StartNode(Node):
 
 class _EndNode(Node):
     """Special END node — termination point of the graph."""
-    def __init__(self):
-        super().__init__("END", self._end)
+    def __init__(self, graph_state):
+        super().__init__("END", self._end, graph_state)
 
     def _end(self, state):
         # END could finalize/clean state before returning
@@ -82,8 +83,7 @@ class ConditionalEdge(Edge):
         self.passes += 1
         return self.condition(data) and self.passes <= self.max_passes
 
-
-
+NodePoolItem.model_rebuild()  
 
 
 #Runner constarain for now: support fallback, condtional, :

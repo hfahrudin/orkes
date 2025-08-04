@@ -1,19 +1,19 @@
-from agents.core import AgentInterface
+from orkes.agents.core import AgentInterface
 from typing import Callable, Union, Dict, Optional
 from orkes.graph.utils import function_assertion, is_typeddict_class, check_dict_values_type
 from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode
 from orkes.graph.schema import NodePoolItem
 
 
-START = _StartNode()
-END = _EndNode()
-
 
 class OrkesGraph:
     def __init__(self, state):
+        self.state = state
+        self.START = _StartNode(self.state)
+        self.END = _EndNode(self.state)
         self.nodes_pool: Dict[str, NodePoolItem] = {
-            "START" : NodePoolItem(node=START),
-            "END" : NodePoolItem(node=END)
+            "START" : NodePoolItem(node=self.START),
+            "END" : NodePoolItem(node=self.END)
         }
         if not is_typeddict_class(state):
             raise TypeError("Expected a TypedDict class")
@@ -27,11 +27,11 @@ class OrkesGraph:
         if name in self.nodes_pool:
             raise ValueError(f"Agent '{name}' already exists.")
 
-        if not function_assertion(func, type(self.state)):
+        if not function_assertion(func, self.state):
             raise TypeError(
-                f"No parameter of 'node' has type matching Graph State ({type(self.state)})."
+                f"No parameter of 'node' has type matching Graph State ({self.state})."
             )
-        self.nodes_pool[name] = NodePoolItem(node=Node(name, func))
+        self.nodes_pool[name] = NodePoolItem(node=Node(name, func, self.state))
 
 
     def add_edge(self, from_node: Union[str, _StartNode], to_node: Union[str, _EndNode]) -> None:
@@ -52,9 +52,9 @@ class OrkesGraph:
         
         from_node_item = self._validate_from_node(from_node)
 
-        if not function_assertion(gate_function, type(self.state)):
+        if not function_assertion(gate_function, self.state):
             raise TypeError(
-                f"No parameter of 'gate_function' has type matching Graph State ({type(self.state)})."
+                f"No parameter of 'gate_function' has type matching Graph State ({self.state})."
             )
 
         self._validate_condition(condition)
@@ -83,7 +83,7 @@ class OrkesGraph:
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
         
-        if not (isinstance(from_node, str) or from_node is START):
+        if not (isinstance(from_node, str) or from_node is self.START ):
             raise TypeError(f"'from_node' must be str or START, got {type(from_node)}")
 
         if isinstance(from_node, str):
@@ -99,7 +99,7 @@ class OrkesGraph:
         return from_node_item
     
     def _validate_to_node(self, to_node: Union[str, _EndNode]):
-        if not (isinstance(to_node, str) or to_node is END):
+        if not (isinstance(to_node, str) or to_node is self.END ):
             raise TypeError(f"'to_node' must be str or END, got {type(to_node)}")
 
         if isinstance(to_node, str):

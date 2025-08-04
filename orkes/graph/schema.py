@@ -1,7 +1,13 @@
 from pydantic import BaseModel
-from orkes.graph.unit import Node, Edge
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from orkes.graph.unit import Node, Edge
 
 class NodePoolItem(BaseModel):
-    node: Node
-    edge: Optional[Edge] = None
+    node: "Node"
+    edge: Optional["Edge"] = None
+
+    model_config = {
+        "arbitrary_types_allowed": True
+    }
