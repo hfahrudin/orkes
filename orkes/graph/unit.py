@@ -53,10 +53,10 @@ class Edge(ABC):
         self.passes = 0
         self.max_passes = max_passes
 
-    @abstractmethod
-    def should_transfer(self, data: Any) -> bool:
-        """Must be implemented by all edge types."""
-        pass
+    # @abstractmethod
+    # def should_transfer(self, data: Any) -> bool:
+    #     """Must be implemented by all edge types."""
+    #     pass
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.id})"
@@ -79,9 +79,9 @@ class ConditionalEdge(Edge):
         self.condition = condition
         self.edge_type = "__conditional__"
 
-    def should_transfer(self, data: Any) -> bool:
-        self.passes += 1
-        return self.condition(data) and self.passes <= self.max_passes
+    # def should_transfer(self, data: Any) -> bool:
+    #     self.passes += 1
+    #     return self.condition(data) and self.passes <= self.max_passes
 
 NodePoolItem.model_rebuild()  
 

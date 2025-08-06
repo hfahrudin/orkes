@@ -11,7 +11,7 @@ class OrkesGraph:
         self.state = state
         self.START = _StartNode(self.state)
         self.END = _EndNode(self.state)
-        self.nodes_pool: Dict[str, NodePoolItem] = {
+        self._nodes_pool: Dict[str, NodePoolItem] = {
             "START" : NodePoolItem(node=self.START),
             "END" : NodePoolItem(node=self.END)
         }
@@ -24,14 +24,14 @@ class OrkesGraph:
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
     
-        if name in self.nodes_pool:
+        if name in self._nodes_pool:
             raise ValueError(f"Agent '{name}' already exists.")
 
         if not function_assertion(func, self.state):
             raise TypeError(
                 f"No parameter of 'node' has type matching Graph State ({self.state})."
             )
-        self.nodes_pool[name] = NodePoolItem(node=Node(name, func, self.state))
+        self._nodes_pool[name] = NodePoolItem(node=Node(name, func, self.state))
 
 
     def add_edge(self, from_node: Union[str, _StartNode], to_node: Union[str, _EndNode]) -> None:
@@ -44,7 +44,12 @@ class OrkesGraph:
 
         edge = ForwardEdge(from_node_item, to_node_item)
 
-        self.nodes_pool[from_node_item.node.name].edge = edge
+        self._nodes_pool[from_node_item.node.name].edge = edge
+
+        if to_node_item == self._nodes_pool['END']:
+            #TODO: need to have safer end handler
+            to_node_item.edge = "<END GRAPH TOKEN>"
+
 
     def add_conditional_edges(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, Union[str, Node]]):
         if self._freeze:
@@ -61,13 +66,13 @@ class OrkesGraph:
 
         edge = ConditionalEdge(from_node_item, gate_function, condition)
 
-        self.nodes_pool[from_node_item.node.name].edge = edge
+        self._nodes_pool[from_node_item.node.name].edge = edge
 
     def _validate_condition(self, condition: Dict[str, Union[str, Node]]):
         for key, target in condition.items():
             #if target is a string, it must be a registered node
             if isinstance(target, str):
-                if target not in self.nodes_pool:
+                if target not in self._nodes_pool:
                     raise ValueError(
                         f"Condition branch '{key}' points to node '{target}', "
                         f"but that node does not exist in the workflow."
@@ -87,11 +92,11 @@ class OrkesGraph:
             raise TypeError(f"'from_node' must be str or START, got {type(from_node)}")
 
         if isinstance(from_node, str):
-            if from_node not in self.nodes_pool:
+            if from_node not in self._nodes_pool:
                 raise ValueError(f"From node '{from_node}' does not exist")
-            from_node_item = self.nodes_pool[from_node]
+            from_node_item = self._nodes_pool[from_node]
         else:
-            from_node_item = self.nodes_pool['START']
+            from_node_item = self._nodes_pool['START']
 
         if from_node_item.edge is not None:
             raise RuntimeError("Edge already assigned to this node.")
@@ -103,11 +108,11 @@ class OrkesGraph:
             raise TypeError(f"'to_node' must be str or END, got {type(to_node)}")
 
         if isinstance(to_node, str):
-            if to_node not in self.nodes_pool:
+            if to_node not in self._nodes_pool:
                 raise ValueError(f"To node '{to_node}' does not exist")
-            to_node_item = self.nodes_pool[to_node]
+            to_node_item = self._nodes_pool[to_node]
         else:
-            to_node_item = self.nodes_pool['END']
+            to_node_item = self._nodes_pool['END']
         return to_node_item
 
     def run(self, query):
@@ -119,13 +124,20 @@ class OrkesGraph:
     def compile(self):
         #check nodes need to have branch
         #check start point inttegrity
+        if not self._nodes_pool['START'].edge:
+            raise RuntimeError("The Graph entry point is not assigned")
+
         #check all conditional
         #checkk all fallback
         #check end point integrity
+        if not self._nodes_pool['END'].edge:
+            raise RuntimeError("The Graph end point is not assigned")
         #check all function
         #should have all exit node
         #no loose end
-        pass
+
+        self._freeze = True
+
     
 
 # function example
