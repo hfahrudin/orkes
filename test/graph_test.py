@@ -39,8 +39,8 @@ agent_graph.add_node('multiply_by_2' , multiply_by_2)
 agent_graph.add_node('add_3' , add_3)
 agent_graph.add_node('greater_than_10' , greater_than_10)
 
-agent_graph.add_edge("add_3", "multiply_by_2")
-agent_graph.add_edge("multiply_by_2", "greater_than_10")
+agent_graph.add_edge("add_3", "greater_than_10")
+
 
 agent_graph.add_edge(START_node, "add_3")
 agent_graph.add_edge("greater_than_10", END_node)

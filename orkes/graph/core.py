@@ -135,7 +135,9 @@ class OrkesGraph:
         #check all function
         #should have all exit node
         #no loose end
-
+        for node_name, node in self._nodes_pool.items():
+            if not node.edge:  # Checks if edge is empty
+                raise RuntimeError(f"Node '{node_name}' has an empty edge.")
         self._freeze = True
 
     
