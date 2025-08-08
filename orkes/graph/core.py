@@ -15,6 +15,7 @@ class OrkesGraph:
             "START" : NodePoolItem(node=self.START),
             "END" : NodePoolItem(node=self.END)
         }
+        self._edge_pool = []
         if not is_typeddict_class(state):
             raise TypeError("Expected a TypedDict class")
         self.state = state
@@ -45,7 +46,7 @@ class OrkesGraph:
         edge = ForwardEdge(from_node_item, to_node_item)
 
         self._nodes_pool[from_node_item.node.name].edge = edge
-
+        self._edge_pool.append(edge)
         if to_node_item == self._nodes_pool['END']:
             #TODO: need to have safer end handler
             to_node_item.edge = "<END GRAPH TOKEN>"
@@ -65,7 +66,7 @@ class OrkesGraph:
         self._validate_condition(condition)
 
         edge = ConditionalEdge(from_node_item, gate_function, condition)
-
+        self._edge_pool.append(edge)
         self._nodes_pool[from_node_item.node.name].edge = edge
 
     def _validate_condition(self, condition: Dict[str, Union[str, Node]]):
