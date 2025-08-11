@@ -52,6 +52,7 @@ class Edge(ABC):
         self.to_node = to_node
         self.passes = 0
         self.max_passes = max_passes
+        self.edge_type = None
 
     # @abstractmethod
     # def should_transfer(self, data: Any) -> bool:

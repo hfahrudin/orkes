@@ -1,5 +1,5 @@
 from orkes.agents.core import AgentInterface
-from typing import Callable, Union, Dict, Optional
+from typing import Callable, Union, Dict, Optional, List
 from orkes.graph.utils import function_assertion, is_typeddict_class, check_dict_values_type
 from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode
 from orkes.graph.schema import NodePoolItem
@@ -15,7 +15,7 @@ class OrkesGraph:
             "START" : NodePoolItem(node=self.START),
             "END" : NodePoolItem(node=self.END)
         }
-        self._edge_pool = []
+        self._edges_pool: List[Edge] = []
         if not is_typeddict_class(state):
             raise TypeError("Expected a TypedDict class")
         self.state = state
@@ -46,7 +46,7 @@ class OrkesGraph:
         edge = ForwardEdge(from_node_item, to_node_item)
 
         self._nodes_pool[from_node_item.node.name].edge = edge
-        self._edge_pool.append(edge)
+        self._edges_pool.append(edge)
         if to_node_item == self._nodes_pool['END']:
             #TODO: need to have safer end handler
             to_node_item.edge = "<END GRAPH TOKEN>"
@@ -66,7 +66,7 @@ class OrkesGraph:
         self._validate_condition(condition)
 
         edge = ConditionalEdge(from_node_item, gate_function, condition)
-        self._edge_pool.append(edge)
+        self._edges_pool.append(edge)
         self._nodes_pool[from_node_item.node.name].edge = edge
 
     def _validate_condition(self, condition: Dict[str, Union[str, Node]]):
@@ -133,9 +133,13 @@ class OrkesGraph:
         #check end point integrity
         if not self._nodes_pool['END'].edge:
             raise RuntimeError("The Graph end point is not assigned")
-        #check all function
         #should have all exit node
-        #no loose end
+        for edge in self._edges_pool:
+            if edge.edge_type == "__forward__":
+                print("Forward: ", edge)
+            elif edge.edge_type == "__conditional__":
+                print("Conditional: ", edge)
+
         for node_name, node in self._nodes_pool.items():
             if not node.edge:  # Checks if edge is empty
                 raise RuntimeError(f"Node '{node_name}' has an empty edge.")
