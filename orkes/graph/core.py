@@ -136,16 +136,39 @@ class OrkesGraph:
         #should have all exit node
         for edge in self._edges_pool:
             if edge.edge_type == "__forward__":
-                print("Forward: ", edge)
+                if not edge.to_node:
+                    raise RuntimeError(f"Edge {edge.id} do not have node destination")
             elif edge.edge_type == "__conditional__":
                 print("Conditional: ", edge)
-
+        self.detect_loop()
         for node_name, node in self._nodes_pool.items():
             if not node.edge:  # Checks if edge is empty
                 raise RuntimeError(f"Node '{node_name}' has an empty edge.")
         self._freeze = True
 
     
+    def detect_loop(self):
+        start_pool = self._nodes_pool['START']
+        visited_path = set()
+        return self._walk_graph(start_pool, visited_path)
+
+    def _walk_graph(self, current_node_item: NodePoolItem, path: set):
+        current_node = current_node_item.node
+        current_node_name = current_node.name
+        # Loop check
+        if current_node_name in path:
+            return True  # Loop found
+
+        path.add(current_node_name)
+
+        next_node_item = current_node_item.edge.to_node
+        if not isinstance(next_node_item.node, _EndNode):
+            if self._walk_graph(next_node_item, path):
+                return True
+
+        path.remove(current_node_name)
+        print(path)
+        return False
 
 # function example
 # "function with state argument + agent is the agreed node"
