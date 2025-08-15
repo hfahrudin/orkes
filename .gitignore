@@ -4,3 +4,4 @@ __pycache__
 *.json
 dist/
 orkes.egg-info/
+upload.py

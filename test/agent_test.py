@@ -1,10 +1,3 @@
-
-import sys
-import os
-
-# Get the absolute path of folder A and add it to sys.path
-sys.path.insert(0, os.path.abspath('../')) 
-
 from orkes.agents.core import Agent
 from orkes.services.connections import vLLMConnection
 from orkes.services.prompts import ChatPromptHandler
