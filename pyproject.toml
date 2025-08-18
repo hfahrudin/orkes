@@ -1,0 +1,20 @@
+[project]
+name = "orkes"
+version = "0.1.1"
+description = "Lightweight multi-agent orchestration framework"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Hasby Fahrudin", email = "fahrudinhasby12@gmail.com" }
+]
+dependencies = [
+  "pydantic>=2.0"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+"Homepage" = "https://github.com/hfahrudin/orkes"

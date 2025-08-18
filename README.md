@@ -1,15 +1,9 @@
 # Orkes
 
-> A lightweight orchestration framework for LLM agents, no abstractions you don’t need, no bloated APIs, just clean coordination logic that works.
-
----
-
 ## 🔍 What is Orkes?
 
 **Orkes** helps you coordinate LLM agents using plain Python.
 No magic, no unnecessary layers. Just **explicit control flow**, **transparent agent logic**, and **simple message passing**.
-
----
 
 ## 🔹 Core Principles
 
@@ -21,8 +15,6 @@ No magic, no unnecessary layers. Just **explicit control flow**, **transparent a
 * **Stateless by default** — you control memory and state
 * **Hackable and debuggable** — nothing hidden
 
----
-
 ## 🛠️ Project Status
 
 This is the initial stage of Orkes.
@@ -33,8 +25,6 @@ This is the initial stage of Orkes.
 * [ ] Minimal examples
 * [ ] Optional visualizer (planned)
 * [ ] Docs and tests (coming)
-
----
 
 ## License
 

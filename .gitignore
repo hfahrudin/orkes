@@ -1,3 +1,7 @@
 venv
 __pycache__
 *.ipynb
+*.json
+dist/
+orkes.egg-info/
+upload.py
