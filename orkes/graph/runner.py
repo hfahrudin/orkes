@@ -11,21 +11,28 @@ class GraphRunner:
 
     #TODO: Modifications are returned as a new copy, not in-place mutation.
     def run(self, invoke_state):
-        for key, value in invoke_state.items():
-            if key in self.graph_state:
-                self.graph_state[key] = value
+        # Check that all keys in invoke_state exist in graph_state
+        missing_keys = [key for key in invoke_state if key not in self.graph_state]
+        if missing_keys:
+            raise KeyError(f"The following items are missing in self.graph_state: {missing_keys}")
+
+        # Merge invoke_state into a copy of graph_state (avoid mutating original)
+        input_state = self.graph_state.copy()
+        input_state.update({k: v for k, v in invoke_state.items() if k in input_state})
+
+        # Start traversal
         start_pool = self.nodes_pool['START']
         start_edges = start_pool.edge
-        input_state = self.graph_state.copy()
-        state = self.tranverse_graph(start_edges, input_state)
+        state = self.traverse_graph(start_edges, input_state)
+        return state
 
     #TODO: fix state only
-    def tranverse_graph(self, current_edge: Edge, input_state: Dict):
+    def traverse_graph(self, current_edge: Edge, input_state: Dict):
         current_node = self.nodes_pool[current_edge.from_node].node
         result = current_node.execute(input_state)
         next_node = current_edge.to_node
         if not isinstance(next_node, _EndNode):
-            result = self.tranverse_graph( next_node, result)
+            result = self.traverse_graph( next_node, result)
         else:
             return result
 

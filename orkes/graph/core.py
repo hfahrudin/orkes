@@ -3,7 +3,7 @@ from typing import Callable, Union, Dict, Optional, List
 from orkes.graph.utils import function_assertion, is_typeddict_class, check_dict_values_type
 from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode
 from orkes.graph.schema import NodePoolItem
-
+from orkes.graph.runner import GraphRunner
 
 
 class OrkesGraph:
@@ -116,12 +116,6 @@ class OrkesGraph:
             to_node_item = self._nodes_pool['END']
         return to_node_item
 
-    def run(self, query):
-        if not self._freeze:
-            raise RuntimeError("Can only run after compile")
-
-        pass
-
     def compile(self):
         #check nodes need to have branch
         #check start point inttegrity
@@ -139,13 +133,13 @@ class OrkesGraph:
                 if not edge.to_node:
                     raise RuntimeError(f"Edge {edge.id} do not have node destination")
             elif edge.edge_type == "__conditional__":
-                print("Conditional: ", edge)
-        self.detect_loop()
+                pass
         for node_name, node in self._nodes_pool.items():
             if not node.edge:  # Checks if edge is empty
                 raise RuntimeError(f"Node '{node_name}' has an empty edge.")
         self._freeze = True
-
+        
+        return GraphRunner(nodes_pool=self._nodes_pool, graph_state=self.state)
     
     def detect_loop(self):
         start_pool = self._nodes_pool['START']
