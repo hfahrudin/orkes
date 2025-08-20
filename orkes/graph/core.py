@@ -92,6 +92,8 @@ class OrkesGraph:
         if not (isinstance(from_node, str) or from_node is self.START ):
             raise TypeError(f"'from_node' must be str or START, got {type(from_node)}")
 
+        #TODO : node to need to return graph
+        
         if isinstance(from_node, str):
             if from_node not in self._nodes_pool:
                 raise ValueError(f"From node '{from_node}' does not exist")
@@ -139,7 +141,7 @@ class OrkesGraph:
                 raise RuntimeError(f"Node '{node_name}' has an empty edge.")
         self._freeze = True
         
-        return GraphRunner(nodes_pool=self._nodes_pool, graph_state=self.state)
+        return GraphRunner(nodes_pool=self._nodes_pool, graph_type=self.state)
     
     def detect_loop(self):
         start_pool = self._nodes_pool['START']
