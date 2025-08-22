@@ -1,3 +1,9 @@
+#FOR LOCAL TESTING
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 from orkes.agents.core import Agent
 from orkes.services.connections import vLLMConnection
 from orkes.services.prompts import ChatPromptHandler

@@ -1,5 +1,5 @@
 
-from typing import Any, Callable
+from typing import Any, Callable, Dict
 import uuid
 from abc import ABC, abstractmethod
 from orkes.graph.schema import NodePoolItem
@@ -71,12 +71,12 @@ class ConditionalEdge(Edge):
     def __init__(
         self,
         from_node: NodePoolItem,
-        judge_func: Callable,
-        condition: Callable,
+        gate_function: Callable,
+        condition: Dict[str, str],
         max_passes=5
     ):
         super().__init__(from_node, to_node=None, max_passes=max_passes)  # initialize parent part
-        self.judge_func = judge_func
+        self.gate_function = gate_function
         self.condition = condition
         self.edge_type = "__conditional__"
 

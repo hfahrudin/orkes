@@ -31,6 +31,23 @@ def greater_than_10(state: State):
     state['condition_result'] = result
     return state
 
+# Add the branching nodes
+def path_true_node(state: State):
+    print("Condition was True!")
+    return state
+
+def path_false_node(state: State):
+    print("Condition was False!")
+    return state
+
+
+def conditional_node(state: State):
+    # Example: check the condition_result
+    if state.get('condition_result', False):
+        return 'true'   # name of the next node if condition is True
+    else:
+        return 'path_false'  # name of the next node if condition is False
+
 # --- Initialize Graph ---
 agent_graph = OrkesGraph(State)
 START_node = agent_graph.START
@@ -40,13 +57,18 @@ END_node = agent_graph.END
 agent_graph.add_node('add_3', add_3)
 agent_graph.add_node('multiply_by_2', multiply_by_2)
 agent_graph.add_node('greater_than_10', greater_than_10)
+agent_graph.add_node('path_true', path_true_node)
+agent_graph.add_node('path_false', path_false_node)
 
 # Add edges
 agent_graph.add_edge(START_node, 'add_3')
 agent_graph.add_edge('add_3', 'multiply_by_2')
 agent_graph.add_edge('multiply_by_2', 'greater_than_10')
-agent_graph.add_edge('greater_than_10', END_node)
+agent_graph.add_conditional_edge('greater_than_10', conditional_node, {'true' : 'path_true', 'false' : 'path_false'})
 
+
+agent_graph.add_edge('path_true', END_node)
+agent_graph.add_edge('path_false', END_node)
 # Compile the graph
 runner = agent_graph.compile()
 

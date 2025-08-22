@@ -1,6 +1,6 @@
 
-from typing import Callable, Any, Dict
-from orkes.graph.unit import Node,Edge
+from typing import Dict, Union
+from orkes.graph.unit import ForwardEdge, ConditionalEdge
 from orkes.graph.schema import NodePoolItem
 from orkes.graph.unit import _EndNode, _StartNode
 
@@ -28,29 +28,40 @@ class GraphRunner:
         return self.graph_state
 
     #TODO: fix state only
-    def traverse_graph(self, current_edge: Edge, input_state: Dict):
+    def traverse_graph(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
+        
+        current_node = current_edge.from_node.node
 
         if current_edge.edge_type == "__forward__":
             print(f"I am here on forward edge {current_edge.id}")
+
+
+            if not isinstance(current_node, _StartNode):
+                result =  current_node.execute(input_state)
+                self.graph_state.update(result)
+            
+            next_edge = current_edge.to_node.edge
+            next_node = current_edge.to_node.node
+            # result = current_node.execute(input_state)
+            # next_node = current_node.edge
+
+
         elif current_edge.edge_type == "__conditional__":
             print(f"I am here on conditional edge {current_edge.id}")
-
-        current_node = current_edge.from_node.node
-        if not isinstance(current_node, _StartNode):
             result =  current_node.execute(input_state)
             self.graph_state.update(result)
-        
-        next_edge = current_edge.to_node.edge
-        next_node = current_edge.to_node.node
 
+            gate_function = current_edge.gate_function
+            condition = current_edge.condition
+            result_gate = gate_function(self.graph_state)
 
-        # result = current_node.execute(input_state)
-        # next_node = current_node.edge
+            next_node_name = condition[result_gate]
+            next_node = self.nodes_pool[next_node_name].node
+            next_edge = self.nodes_pool[next_node_name].edge
+
         if not isinstance(next_node, _EndNode):
             next_input = self.graph_state.copy()
             self.traverse_graph( next_edge, next_input)
-
-
 
 # Handle Brancing and merging state -> because state update only happen after node process done, no shared mutable object
 # FAN IN FAN OUT STRATEGY, EVERY BRANCHING NODE NEED TO BE RETURNED

@@ -52,7 +52,7 @@ class OrkesGraph:
             to_node_item.edge = "<END GRAPH TOKEN>"
 
 
-    def add_conditional_edges(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, Union[str, Node]]):
+    def add_conditional_edge(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, str]):
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
         
@@ -92,7 +92,7 @@ class OrkesGraph:
         if not (isinstance(from_node, str) or from_node is self.START ):
             raise TypeError(f"'from_node' must be str or START, got {type(from_node)}")
 
-        #TODO : node to need to return graph
+        #TODO : node need to return graph (?)
         
         if isinstance(from_node, str):
             if from_node not in self._nodes_pool:
@@ -119,21 +119,23 @@ class OrkesGraph:
         return to_node_item
 
     def compile(self):
-        #check nodes need to have branch
         #check start point inttegrity
         if not self._nodes_pool['START'].edge:
             raise RuntimeError("The Graph entry point is not assigned")
 
-        #check all conditional
-        #checkk all fallback
+        #TODO: check all conditional
+        #TODO: checkk all fallback
+
         #check end point integrity
         if not self._nodes_pool['END'].edge:
             raise RuntimeError("The Graph end point is not assigned")
+        
         #should have all exit node
         for edge in self._edges_pool:
             if edge.edge_type == "__forward__":
                 if not edge.to_node:
                     raise RuntimeError(f"Edge {edge.id} do not have node destination")
+            #TODO: Conditional check
             elif edge.edge_type == "__conditional__":
                 pass
         for node_name, node in self._nodes_pool.items():
@@ -165,26 +167,3 @@ class OrkesGraph:
         path.remove(current_node_name)
         print(path)
         return False
-
-# function example
-# "function with state argument + agent is the agreed node"
-# # Test classes
-# class MyState:
-#     pass
-
-# # Test functions
-# def generate_file(state: MyState, x: int):
-#     pass
-
-
-#Graph feature:
-# DAG, able to cycle, sequential, conditional. 
-#Runner functions: TODO: gambar graph
-#Notes:
-
-# # Graph state
-# class State(TypedDict):
-#     topic: str
-#     joke: str
-#     improved_joke: str
-#     final_joke: str
