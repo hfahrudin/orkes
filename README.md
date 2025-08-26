@@ -37,7 +37,6 @@ This is the initial stage of Orkes.
 * [ ] Agent structure (prompt + tool + fn)
 * [ ] Minimal examples
 * [ ] Optional visualizer (planned)
-* [ ] Docs and tests (coming)
 
 ## License
 
