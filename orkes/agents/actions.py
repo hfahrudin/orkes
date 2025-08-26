@@ -16,16 +16,14 @@ params = {
     },
 }
 '''
-from pydantic import BaseModel, Field, ValidationError
-from typing import Any, Dict, Optional, Type
-
 
 class ActionBuilder:
-    def __init__(self, func_name: str, description: str = ""):
+    def __init__(self, func_name: str, params: Dict[str, Dict[str, Any]], description: str = ""):
         self.func_name = func_name
         self.description = description
         self._model_class: Optional[Type[BaseModel]] = None
         self.memory_buffer = []
+        self.build(params)
 
     def build(self, params: Dict[str, Dict[str, Any]]) -> None:
         annotations = {}
