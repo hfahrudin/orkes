@@ -40,6 +40,8 @@ tool2 = ActionBuilder(func_name="get_domain_details", params={
     "domain": {"type": str, "desc": "The domain name to check"}
 }, description="Fetch SSL/domain info")
 
+ # UPLOAD TO AGENT
 
-print(tool1.get_schema_tool(if_desc=True))
-print(tool2.get_schema_tool())
+ # CHECK IF THE TOOLING IS RIGHT LY IMPLEMENTED ON PROMPT
+
+ #TEST WHETHER AGENT COULD SELECT PROPER TOOLS, OR EVEN NOT CHOOSING AT ALL
