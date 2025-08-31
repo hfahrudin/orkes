@@ -25,6 +25,7 @@ class ChatPromptHandler(PromptInterface):
         """
         self.system_prompt_template = system_prompt_template
         self.user_prompt_template = user_prompt_template  # Fixed variable assignment
+        self._tools_prompt = None
         
     def gen_messages(self, queries, chat_history: list = None):
         # queries should look like this
