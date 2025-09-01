@@ -49,7 +49,7 @@ tool_agent = ToolAgent(name="agent_0", llm_connection=connection)
 
 tool_agent.add_tools([tool1, tool2])
 
-print(tool_agent._build_tools_prompt())
+print(tool_agent.invoke("i want to eat sushi"))
 
 # # print(my_agent.invoke())
 
