@@ -1,10 +1,13 @@
 from orkes.services.connections import LLMInterface
 from orkes.services.prompts import PromptInterface
 from orkes.agents.actions import ActionBuilder
+from orkes.services.prompts import ChatPromptHandler
 from abc import ABC, abstractmethod
 from orkes.services.responses import ResponseInterface
 from typing import Dict, List
 import json
+from requests import Response
+import re
 
 class AgentInterface(ABC):
 
@@ -97,9 +100,35 @@ class ToolAgent(AgentInterface):
 
         return prompt + tools_block
     
-    def invoke(self, queries, chat_history=None):
+    def invoke(self, query, chat_history=None):
+        system_prompt="{tools}"
+        user_prompt="{input}"
+        queries = {
+            "system" : {"tools" : self._build_tools_prompt()},
+            "user" : {"input" : query}
+        }
+        cP = ChatPromptHandler(system_prompt_template=system_prompt, user_prompt_template=user_prompt)
+        message = cP.gen_messages(queries, chat_history)
+        response = self.llm_handler.send_message(message)
+        return self._parse_tool_response(response)
+    
+    def _parse_tool_response(self, response: Response):
+        response_json = response.json()
+        content = response_json['choices'][0]['message']['content']
+        match = re.search(r'\[\s*{.*}\s*\]', content, re.DOTALL)
 
-        return 1
+        if match:
+            try:
+                # Parse the JSON array
+                tool_calls = json.loads(match.group())
+            except json.JSONDecodeError:
+                tool_calls = []
+        else:
+            tool_calls = []
+
+        return tool_calls
     
     async def stream(self, queries, chat_history=None, stream_buffer=False, client_connection=None):
         return 1
+    
+    
