@@ -59,8 +59,13 @@ class ToolAgent(AgentInterface):
             "<|start_of_role|>system<|end_of_role|>\n"
             "You are an AI assistant with access to a set of tools that can help answer user queries.\n\n"
             "When a tool is required to answer the user's query, respond with <|tool_call|> "
-            "followed by a JSON list of tools used.\n\n"
-            "If a tool does not exist in the provided list of tools, notify the user that you do not have the ability to fulfill the request.\n"
+            "followed by a list of tools used.\n\n"
+            "Each tool call must have this exact structure:\n"
+            "{\n"
+            "  \"function\": <function_name_as_string>,\n"
+            "  \"parameters\": { <parameter_name>: <value>, ... }\n"
+            "}\n"
+            "Do NOT add any extra text or fields.\n"
             "<|end_of_text|>"
         )
 
@@ -100,7 +105,7 @@ class ToolAgent(AgentInterface):
 
         return prompt + tools_block
     
-    def invoke(self, query, chat_history=None):
+    def invoke(self, query, chat_history=None, execute_tools=False):
         system_prompt="{tools}"
         user_prompt="{input}"
         queries = {
@@ -110,21 +115,58 @@ class ToolAgent(AgentInterface):
         cP = ChatPromptHandler(system_prompt_template=system_prompt, user_prompt_template=user_prompt)
         message = cP.gen_messages(queries, chat_history)
         response = self.llm_handler.send_message(message)
-        return self._parse_tool_response(response)
+        tools_called = self._parse_tool_response(response)
+        if execute_tools:
+            result = {}
+            for tool_call in tools_called:
+                tool_name = tool_call["function"]
+                params = tool_call["parameters"]
+                if tool_name in self.tools:
+                    tool = self.tools[tool_name]
+                    try:
+                        tool_result =  tool.execute(params)
+                        result[tool_name] = tool_result
+                    except Exception as e:
+                        result[tool_name] = f"Error executing tool '{tool_name}': {str(e)}"
+                else:
+                    result[tool_name] = f"Tool '{tool_name}' not found"
+            return result
+        
+        return tools_called
     
-    def _parse_tool_response(self, response: Response):
+
+    def _parse_tool_response(self, response):
+        """
+        Parse LLM response for tool calls and normalize them.
+        Accepts both:
+        1) {'type': 'function', 'function': {'name': '...', 'parameters': {...}}}
+        2) {'function': '...', 'parameters': {...}}
+        """
         response_json = response.json()
         content = response_json['choices'][0]['message']['content']
-        match = re.search(r'\[\s*{.*}\s*\]', content, re.DOTALL)
+        content = re.sub(r"<\|.*?\|>", "", content).strip()
+        # Extract JSON array from text
+        tool_calls = []
+        try:
+            candidate_calls = json.loads(content)
+        except json.JSONDecodeError:
+            candidate_calls = []
 
-        if match:
-            try:
-                # Parse the JSON array
-                tool_calls = json.loads(match.group())
-            except json.JSONDecodeError:
-                tool_calls = []
-        else:
-            tool_calls = []
+        for call in candidate_calls:
+            # Case 1: nested 'function' dict
+            if isinstance(call.get("function"), dict):
+                func = call["function"]
+                if "name" in func and "parameters" in func:
+                    tool_calls.append({
+                        "function": func["name"],
+                        "parameters": func["parameters"]
+                    })
+            # Case 2: simple format
+            elif "function" in call and "parameters" in call:
+                tool_calls.append({
+                    "function": call["function"],
+                    "parameters": call["parameters"]
+                })
 
         return tool_calls
     

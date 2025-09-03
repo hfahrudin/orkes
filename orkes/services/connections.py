@@ -28,11 +28,11 @@ class LLMInterface(ABC):
 
 
 class vLLMConnection(LLMInterface):
-    def __init__(self, url: str, model_name = str, headers: Optional[Dict[str, str]] = None):
+    def __init__(self, url: str, model_name = str, headers: Optional[Dict[str, str]] = None, api_key = None):
         self.url = url
-        self.headers = headers if headers else {
-            'Content-Type': 'application/json',
-        }
+        self.headers = headers.copy() if headers else {"Content-Type": "application/json"}
+        if api_key:
+            self.headers["Authorization"] = f"Bearer {api_key}"
 
         self.default_setting = {
             "temperature": 0.2,

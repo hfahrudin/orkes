@@ -42,6 +42,7 @@ tool2 = ActionBuilder(func_name="get_domain_details", params={
     "domain": {"type": str, "desc": "The domain name to check"}
 }, description="Fetch SSL/domain info", func=get_domain_details)
 
+# ------------------ Agent Definition ------------------ #
 
 connection = vLLMConnection(url="http://localhost:8000/", model_name="auto")
 
@@ -49,12 +50,6 @@ tool_agent = ToolAgent(name="agent_0", llm_connection=connection)
 
 tool_agent.add_tools([tool1, tool2])
 
-print(tool_agent.invoke("i want to eat sushi"))
+result = tool_agent.invoke("im curious about this domain info crosscert.com , and this ip 192.168.1.1.", execute_tools=False)
 
-# # print(my_agent.invoke())
-
- # UPLOAD TO AGENT
-
- # CHECK IF THE TOOLING IS RIGHT LY IMPLEMENTED ON PROMPT
-
- #TEST WHETHER AGENT COULD SELECT PROPER TOOLS, OR EVEN NOT CHOOSING AT ALL
+print(result)

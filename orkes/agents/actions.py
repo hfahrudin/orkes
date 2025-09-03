@@ -17,6 +17,15 @@ params = {
 }
 '''
 
+TYPE_MAPPING = {
+    "str": "string",
+    "int": "integer",
+    "float": "number",
+    "bool": "boolean",
+    "list": "array",
+    "dict": "object",
+}
+
 class ActionBuilder:
     def __init__(
         self, 
@@ -64,7 +73,8 @@ class ActionBuilder:
 
         for field_name, field in model_cls.model_fields.items():
             field_type = field.annotation.__name__.lower()
-            schema["properties"][field_name] = {"type": field_type}
+            json_type = TYPE_MAPPING.get(field_type, "string")
+            schema["properties"][field_name] = {"type": json_type}
 
             if if_desc:
                 schema["properties"][field_name]["description"] = (field.description or "").lower()
