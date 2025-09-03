@@ -135,7 +135,7 @@ class ToolAgent(AgentInterface):
         return tools_called
     
 
-    def _parse_tool_response(self, response):
+    def _parse_tool_response(self, response: Response):
         """
         Parse LLM response for tool calls and normalize them.
         Accepts both:
