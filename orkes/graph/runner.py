@@ -89,3 +89,10 @@ class GraphRunner:
 # The merge node M merges C and D’s outputs.
 
 # Then E runs with the combined state.
+
+#looping mechanism?
+# Requirement: 
+# tracking graph journey
+# detecting potential looping
+# add looping counter
+# looping would be edge base
