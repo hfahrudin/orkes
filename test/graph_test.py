@@ -63,7 +63,7 @@ agent_graph.add_node('path_false', path_false_node)
 # Add edges
 agent_graph.add_edge(START_node, 'add_3')
 agent_graph.add_edge('add_3', 'multiply_by_2')
-agent_graph.add_edge('multiply_by_2', 'greater_than_10')
+agent_graph.add_edge('multiply_by_2', 'add_3')
 agent_graph.add_conditional_edge('greater_than_10', conditional_node, {'true' : 'path_true', 'false' : 'path_false'})
 
 
@@ -81,5 +81,5 @@ state: State = {
 }
 
 result= runner.run(state)
-print(result)
+
 # print(agent_graph._nodes_pool)

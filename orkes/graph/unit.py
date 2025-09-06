@@ -46,7 +46,7 @@ class _EndNode(Node):
         return state
 
 class Edge(ABC):
-    def __init__(self, from_node: NodePoolItem, to_node: NodePoolItem = None, max_passes=5):
+    def __init__(self, from_node: NodePoolItem, to_node: NodePoolItem = None, max_passes=25):
         self.id = str(uuid.uuid4())
         self.from_node = from_node
         self.to_node = to_node
@@ -63,7 +63,7 @@ class Edge(ABC):
         return f"{self.__class__.__name__}({self.id})"
 
 class ForwardEdge(Edge):
-    def __init__(self, from_node: NodePoolItem, to_node: NodePoolItem, max_passes: int = 5):
+    def __init__(self, from_node: NodePoolItem, to_node: NodePoolItem, max_passes: int = 25):
         super().__init__(from_node, to_node, max_passes)
         self.edge_type = "__forward__"
 
@@ -73,7 +73,7 @@ class ConditionalEdge(Edge):
         from_node: NodePoolItem,
         gate_function: Callable,
         condition: Dict[str, str],
-        max_passes=5
+        max_passes=25
     ):
         super().__init__(from_node, to_node=None, max_passes=max_passes)  # initialize parent part
         self.gate_function = gate_function

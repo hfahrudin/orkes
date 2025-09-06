@@ -165,5 +165,4 @@ class OrkesGraph:
                 return True
 
         path.remove(current_node_name)
-        print(path)
         return False

@@ -27,15 +27,19 @@ class GraphRunner:
         self.traverse_graph(start_edges, input_state)
         return self.graph_state
 
-    #TODO: fix state only
     def traverse_graph(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
-        
+
+        if current_edge.passes > current_edge.max_passes:
+            raise RuntimeError(
+                f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
+                "exceeding the allowed maximum without reaching a stop condition."
+            )
+        else:
+            current_edge.passes+=1
+
         current_node = current_edge.from_node.node
-
+        
         if current_edge.edge_type == "__forward__":
-            print(f"I am here on forward edge {current_edge.id}")
-
-
             if not isinstance(current_node, _StartNode):
                 result =  current_node.execute(input_state)
                 self.graph_state.update(result)
@@ -47,7 +51,6 @@ class GraphRunner:
 
 
         elif current_edge.edge_type == "__conditional__":
-            print(f"I am here on conditional edge {current_edge.id}")
             result =  current_node.execute(input_state)
             self.graph_state.update(result)
 
@@ -89,10 +92,3 @@ class GraphRunner:
 # The merge node M merges C and D’s outputs.
 
 # Then E runs with the combined state.
-
-#looping mechanism?
-# Requirement: 
-# tracking graph journey
-# detecting potential looping
-# add looping counter
-# looping would be edge base
