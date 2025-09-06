@@ -1,6 +1,8 @@
 #FOR LOCAL TESTING
 import sys
 import os
+import asyncio
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -14,7 +16,6 @@ user_prompt="{input}"
 cR = ChatResponse()
 cP = ChatPromptHandler(system_prompt_template=system_prompt, user_prompt_template=user_prompt)
 connection = vLLMConnection(url="http://localhost:8000/", model_name="auto")
-
 
 my_agent = Agent(name="agent_0", prompt_handler=cP, llm_connection=connection, response_handler=cR)
 
@@ -30,17 +31,11 @@ queries = {
 
 chat_history = []
 
-print(my_agent.invoke(queries))
 
+print(my_agent.stream(queries))
 
+async def main():
+    async for chunk in my_agent.stream(queries, mode="sse"):
+        print(chunk)
 
-# import asyncio
-
-# async def main():
-
-#     # async generator returns chunks
-#     async for chunk in my_agent.stream(queries, stream_buffer=False):
-#         print("Received chunk:", chunk)
-
-# # Run the async main function
-# asyncio.run(main())
+asyncio.run(main())

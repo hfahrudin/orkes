@@ -10,7 +10,7 @@ class ResponseInterface:
     Defines methods to parse messages.
     """
     @abstractmethod
-    def parse_stream_response(self, chunk):
+    def parse_stream_response(self, chunk, **kwargs):
         """Parse the stream response from the LLM."""
         pass
 
@@ -30,20 +30,31 @@ class ChatResponse(ResponseInterface):
         #SSE type of response
         self.eot_token = end_token
 
-    def parse_stream_response(self, chunk):
-        chunk_str = chunk.decode('utf-8')
-        if chunk_str.startswith("data:"):
-            # Parse the SSE chunk data
-            data_str = chunk_str[len("data:"):].strip()
+    def parse_stream_response(self, chunk: bytes, sse = False):
+        if not chunk:
+            v = ""
+
+        chunk_str = chunk.decode('utf-8').strip()
+        if not chunk_str or not chunk_str.startswith("data:"):
+            v = ""
+
+        data_str = chunk_str[len("data:"):].strip()
+        if data_str == "[DONE]":
+            v = "[DONE]"
+
+        try:
             chunk_data = json.loads(data_str)
             delta_content = chunk_data['choices'][0]['delta'].get('content', '')
-            # Handle end-of-text indicator
-            if delta_content == self.eot_token:
-                return "<EOT_TOKEN>"
-            else:
-                return delta_content
+            v = "" if delta_content == self.eot_token else delta_content
+
+        except json.JSONDecodeError:
+            v = ""
+
+
+        if sse:
+            return self._generate_event(v)
         else:
-            return ""
+            return v
             
     def _generate_event(self, buffer):
         event = {}

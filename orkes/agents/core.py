@@ -16,10 +16,6 @@ class AgentInterface(ABC):
         """Invoke the agent with a message."""
         pass
 
-    @abstractmethod
-    async def stream(self, queries, chat_history, **kwargs):
-        """Invoke the agent with streaming."""
-        pass
 
 class Agent(AgentInterface):
     def __init__(self, name: str, prompt_handler: PromptInterface, 
@@ -38,14 +34,15 @@ class Agent(AgentInterface):
         return response_json
 
     #TODO: ITS NOT WORKING STILL
-    async def stream(self, queries, chat_history=None, stream_buffer=False, client_connection=None):
+    async def stream(self, queries, chat_history=None, client_connection=None, mode="default"):
         message = self.prompt_handler.gen_messages(queries, chat_history)
-        yield message
         async for chunk in self.llm_handler.stream_message(message):
-            text_delta = self.response_handler.parse_stream_response(chunk)
-            
-            # if stream_buffer and client_connection:
-            #     await client_connection(text_delta)  # send incremental update
+            if mode == 'default':
+                text_delta = self.response_handler.parse_stream_response(chunk)
+            elif mode == 'raw':
+                text_delta = chunk
+            elif mode == 'sse':
+                text_delta = self.response_handler.parse_stream_response(chunk, sse=True)
             
             yield text_delta  # optionally yield for other 
     
@@ -169,8 +166,3 @@ class ToolAgent(AgentInterface):
                 })
 
         return tool_calls
-    
-    async def stream(self, queries, chat_history=None, stream_buffer=False, client_connection=None):
-        return 1
-    
-    

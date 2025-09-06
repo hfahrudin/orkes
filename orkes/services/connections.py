@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Dict
+from typing import Optional, Dict, AsyncGenerator
 import requests
 from requests import Response
 import json
@@ -16,7 +16,7 @@ class LLMInterface(ABC):
         pass
     
     @abstractmethod
-    def stream_message(self, message, **kwargs) -> Response:
+    def stream_message(self, message, **kwargs) -> AsyncGenerator[str, None]:
         """Stream the response incrementally."""
         pass
 
@@ -43,7 +43,7 @@ class vLLMConnection(LLMInterface):
         }
         self.model_name = model_name
 
-    def stream_message(self, message, end_point = "/v1/chat/completions", settings = None):
+    async def stream_message(self, message, end_point = "/v1/chat/completions", settings = None)  -> AsyncGenerator[str, None]:
         full_url = self.url + end_point
         payload = {
             "messages": message,
@@ -53,7 +53,8 @@ class vLLMConnection(LLMInterface):
         }
         # Post request to the full URL with the payload
         response = requests.post(full_url, headers=self.headers, data=json.dumps(payload), stream=True)
-        return response
+        for line in response.iter_lines():
+            yield line
 
     def send_message(self, message, end_point="/v1/chat/completions", settings=None):
         full_url = self.url + end_point
