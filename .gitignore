@@ -5,3 +5,4 @@ __pycache__
 dist/
 orkes.egg-info/
 upload.py
+.env

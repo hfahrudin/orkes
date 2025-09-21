@@ -33,7 +33,7 @@ class Agent(AgentInterface):
         response_json = response.json()
         return response_json
 
-    #TODO: ITS NOT WORKING STILL
+
     async def stream(self, queries, chat_history=None, client_connection=None, mode="default"):
         message = self.prompt_handler.gen_messages(queries, chat_history)
         async for chunk in self.llm_handler.stream_message(message):

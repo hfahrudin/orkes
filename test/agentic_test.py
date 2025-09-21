@@ -2,12 +2,15 @@ from duckduckgo_search import DDGS
 #FOR LOCAL TESTING
 import sys
 import os
-
+from prompt_test import planner_prompt_system, planner_prompt_input
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from orkes.graph.core import OrkesGraph
 from typing import TypedDict
-
+from orkes.agents.core import Agent
+from orkes.services.connections import vLLMConnection
+from orkes.services.prompts import ChatPromptHandler
+from orkes.services.responses import ChatResponse
 
 # ------------------ State Definition ------------------ #
 
@@ -20,8 +23,11 @@ class State(TypedDict):
     ranked_results: list
     personalized_evaluation: dict
     final_recommendations: list
+    tools: list
+    plan :list
+    status: str
 
-
+connection = vLLMConnection()
 
 # ------------------ Action Definition ------------------ #
 
@@ -37,8 +43,21 @@ def search(query, max_results=10):
 # ------------------ Node Definition ------------------ #
 
 #Entry Node
+def entry_node(state: State):
+    result = state.get('initial', 0) + 3
+    state['add_result'] = result
+    return state
 
 #Planner Node
+def planner_node(state: State):
+    cR = ChatResponse()
+    cP = ChatPromptHandler(system_prompt_template=planner_prompt_system, user_prompt_template=planner_prompt_input)
+
+
+    planner_agent = Agent(name="agent_0", prompt_handler=cP, llm_connection=connection, response_handler=cR)
+
+    return state
+
 
 #Action Node -> Search Queries, Result Aggregation, and Recommendation
 
@@ -80,3 +99,40 @@ planner_context = {
     "goals": "Recommendations must be personalized and avoid duplicates, present at least 3 results, and rank by genre similarity.",
     "output_format": "JSON plan for action agent execution"
 }
+cR = ChatResponse()
+cP = ChatPromptHandler(system_prompt_template=planner_prompt_system, user_prompt_template=planner_prompt_input)
+
+
+planner_agent = Agent(name="agent_0", prompt_handler=cP, llm_connection=connection, response_handler=cR)
+queries = {
+    "system" : {
+        "genre" : user_profile["favorite_genres"],
+        "watched_anime" : user_profile["watched_anime"],
+        "preferred_length" : user_profile["preferred_length"],
+        "query" : "recommend me some anime similar to Inuyasha"
+    },
+    "user" : {
+    }
+}
+
+res = planner_agent.invoke(queries=queries)
+import json
+import re
+def extract_json(raw_text):
+    """
+    Extract and parse JSON from a string that may contain
+    markdown code fences or extra characters.
+    
+    Args:
+        raw_text (str): Input string containing JSON.
+        
+    Returns:
+        dict: Parsed JSON object.
+    """
+    # Remove markdown code fences if present
+    cleaned = re.sub(r"```json\s*|```", "", raw_text, flags=re.IGNORECASE).strip()
+    
+    # Parse the cleaned JSON string
+    return json.loads(cleaned)
+raw = res["choices"][0]['message']['content']
+print(extract_json(raw))
