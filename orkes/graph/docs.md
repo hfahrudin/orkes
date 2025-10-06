@@ -3,25 +3,19 @@
 
 `OrkesGraph` provides a **graph-based orchestration layer** for connecting and running computational nodes (functions) with conditional and forward edges. It is designed to integrate with **typed state dictionaries** and agent workflows. `GraphRunner` executes compiled graphs in a safe and structured way.
 
----
 
-## 📘 Table of Contents
-
+## Table of Contents
 1. [Overview](#overview)
 2. [Class Diagram](#class-diagram)
 3. [Core Concepts](#core-concepts)
 4. [Classes](#classes)
-
    * [OrkesGraph](#orkesgraph)
    * [GraphRunner](#graphrunner)
 5. [Usage Example](#usage-example)
 6. [Validation & Safety](#validation--safety)
 7. [TODO / Future Extensions](#todo--future-extensions)
 
----
-
-## 🧩 Overview
-
+## Overview
 `OrkesGraph` is a **directed graph orchestrator** for function nodes:
 
 * Nodes represent **functions** operating on a **typed state dictionary**.
@@ -30,9 +24,7 @@
 * Designed for **agent orchestration**, workflow pipelines, or RAG/LLM orchestration.
 * `GraphRunner` executes a compiled graph, applying node functions sequentially while maintaining state integrity.
 
----
-
-## 🧱 Class Diagram
+## Class Diagram
 
 ```
 OrkesGraph
@@ -49,9 +41,7 @@ GraphRunner
 ├── run(invoke_state: Dict) -> Dict
 ```
 
----
-
-## 🧠 Core Concepts
+## Core Concepts
 
 | Concept            | Description                                                             |
 | ------------------ | ----------------------------------------------------------------------- |
@@ -63,9 +53,8 @@ GraphRunner
 | Edge Pool          | Registry of all edges in the graph.                                     |
 | Conditional Branch | Allows branching execution depending on a gate function and conditions. |
 
----
 
-## 🏗️ Classes
+## Classes
 
 ### `OrkesGraph`
 
@@ -83,7 +72,6 @@ graph = OrkesGraph(state=MyTypedState)
 
 **Raises:** `TypeError` if `state` is not a TypedDict class.
 
----
 
 #### Key Methods
 
@@ -116,7 +104,6 @@ Detect cycles in the graph. Returns `True` if a loop exists.
 
 Internal validation methods for nodes and conditional branches.
 
----
 
 ### `GraphRunner`
 
@@ -135,7 +122,6 @@ runner = GraphRunner(nodes_pool=nodes_pool, graph_type=MyTypedState)
 
 **Attributes:** `graph_state`, `nodes_pool`, `state_def`
 
----
 
 #### Methods
 
@@ -155,7 +141,7 @@ Executes the graph starting from the `START` node.
 4. Applies node functions sequentially.
 5. Returns the updated state.
 
-**Example:**
+## Usage Example
 
 ```python
 from mygraph import OrkesGraph, GraphRunner
@@ -178,9 +164,7 @@ print(final_state)
 # Output: {'message': 'Hello'}
 ```
 
----
-
-## ✅ Validation & Safety
+## Validation & Safety
 
 * Nodes must be unique.
 * Edges cannot be reassigned.
@@ -190,9 +174,8 @@ print(final_state)
 * Graph is **immutable** after compilation.
 * `run()` avoids mutating input state and validates keys.
 
----
 
-## 🚧 TODO / Future Extensions
+## TODO / Future Extensions
 
 * Safer `_EndNode` handling.
 * Fallback edges for conditional nodes.

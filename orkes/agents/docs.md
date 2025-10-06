@@ -8,13 +8,10 @@ It combines:
 * **Agent** — Standard LLM agent interface with prompt handling and streaming.
 * **ToolAgent** — LLM agent with access to multiple tools for dynamic execution.
 
----
 
 ## 📘 Table of Contents
-
 1. [Overview](#overview)
 2. [Core Classes](#core-classes)
-
    * [ActionBuilder](#actionbuilder)
    * [AgentInterface & Agent](#agentinterface--agent)
    * [ToolAgent](#toolagent)
@@ -22,10 +19,8 @@ It combines:
 4. [Validation & Safety](#validation--safety)
 5. [Future Extensions](#future-extensions)
 
----
 
-## 🧩 Overview
-
+## Overview
 * `ActionBuilder` lets you define **tools/functions** with:
 
   * Typed inputs via **Pydantic models**
@@ -38,16 +33,13 @@ It combines:
 
 This enables **RAG workflows, reasoning pipelines, and multi-tool orchestration**.
 
----
 
-## 🏗️ Core Classes
-
+## Core Classes
 ### `ActionBuilder`
 
 Defines a callable tool with typed input parameters.
 
 #### Initialization
-
 ```python
 builder = ActionBuilder(
     func_name="search_tool",
@@ -61,7 +53,6 @@ builder = ActionBuilder(
 ```
 
 #### Key Methods
-
 | Method                           | Description                                                  |
 | -------------------------------- | ------------------------------------------------------------ |
 | `get_model_class()`              | Returns the Pydantic model class for input validation.       |
@@ -70,10 +61,8 @@ builder = ActionBuilder(
 | `validate_params(data)`          | Validates input dict against schema, returns Pydantic model. |
 | `execute(data)`                  | Validates input and calls the actual function.               |
 
----
 
 ### `AgentInterface` & `Agent`
-
 `AgentInterface` is an abstract base class requiring `invoke()`.
 
 ```python
@@ -83,7 +72,6 @@ class Agent(AgentInterface):
 ```
 
 #### Methods
-
 * `invoke(queries, chat_history=None)` — Generate LLM response.
 * `stream(queries, chat_history=None, mode="default")` — Async streaming with parsing modes:
 
@@ -91,14 +79,11 @@ class Agent(AgentInterface):
   * `raw` — Raw chunks
   * `sse` — Parsed as Server-Sent-Events
 
----
 
 ### `ToolAgent`
-
 An LLM agent with **tools**.
 
 #### Initialization
-
 ```python
 agent = ToolAgent(name="ToolAgent", llm_connection=my_llm)
 ```
@@ -108,7 +93,6 @@ agent = ToolAgent(name="ToolAgent", llm_connection=my_llm)
 * `default_tools_wrapper` — Start/end tokens for tool JSON blocks
 
 #### Methods
-
 | Method                                                  | Description                                           |
 | ------------------------------------------------------- | ----------------------------------------------------- |
 | `add_tools(actions)`                                    | Register a list of `ActionBuilder` tools              |
@@ -117,7 +101,6 @@ agent = ToolAgent(name="ToolAgent", llm_connection=my_llm)
 | `_parse_tool_response(response)`                        | Extracts tool calls from LLM JSON response            |
 
 #### Tool Execution
-
 * Supports **automatic execution** if `execute_tools=True`:
 
 ```python
@@ -126,10 +109,7 @@ results = agent.invoke("Find the latest news", execute_tools=True)
 
 * Returns a dict mapping `tool_name` → result.
 
----
-
-## 💡 Usage Example
-
+## Usage Example
 ```python
 from orkes.agents.actions import ActionBuilder
 from orkes.agents.core import ToolAgent
@@ -162,20 +142,14 @@ print(result)
 # Output: {'AddNumbers': 5}
 ```
 
----
-
-## ✅ Validation & Safety
-
+## Validation & Safety
 * **ActionBuilder** enforces typed inputs via Pydantic.
 * **Duplicate tools** are rejected.
 * **LLM tool response parsing** normalizes JSON to `{function, parameters}`.
 * Tool execution errors are captured per tool to prevent crashes.
 * Tools can be executed safely or just listed by the LLM.
 
----
-
-## 🚀 Future Extensions
-
+## Future Extensions
 * Support **async tool execution**.
 * Automatic **tool selection reasoning** using LLM outputs.
 * Richer **tool metadata** (categories, constraints).

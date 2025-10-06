@@ -9,20 +9,16 @@ This documentation covers the three foundational components of the **LLM Core La
 
 Together, they form the base for building **LLM-driven agent pipelines** or **custom orchestration frameworks**.
 
----
-
-## 📘 Table of Contents
-
+## Table of Contents
 1. [Architecture Overview](#architecture-overview)
 2. [Prompt Handler](#prompt-handler)
 3. [LLM Connection](#llm-connection)
 4. [Response Parser](#response-parser)
-5. [End-to-End Example](#end-to-end-example)
+5. [Usage Example](#usage-example)
 6. [Future Extensions](#future-extensions)
 
----
 
-## 🧩 Architecture Overview
+## Architecture Overview
 
 ```
 ┌──────────────────────────────┐
@@ -45,9 +41,8 @@ Together, they form the base for building **LLM-driven agent pipelines** or **cu
 
 Each layer can be **independently extended** (e.g. adding support for OpenAI, Claude, or Mistral).
 
----
 
-## 💬 Prompt Handler
+## Prompt Handler
 
 ### Overview
 
@@ -61,9 +56,6 @@ Used to construct messages like:
   {"role": "user", "content": "..."}
 ]
 ```
-
----
-
 ### Class Diagram
 
 ```
@@ -75,7 +67,6 @@ PromptInterface (ABC)
        └── get_all_keys()
 ```
 
----
 
 ### `PromptInterface`
 
@@ -85,8 +76,6 @@ Abstract base class defining required prompt operations.
 | ------------------------------------------ | ----------------------------------------------- |
 | `gen_messages(queries, chat_history=None)` | Generate full chat message payloads             |
 | `get_all_keys()`                           | Return expected placeholder keys from templates |
-
----
 
 ### `ChatPromptHandler`
 
@@ -117,7 +106,7 @@ queries = {
 messages = handler.gen_messages(queries)
 ```
 
-➡️ Output:
+Output:
 
 ```python
 [
@@ -126,9 +115,7 @@ messages = handler.gen_messages(queries)
 ]
 ```
 
----
-
-## 🔗 LLM Connection
+## LLM Connection
 
 ### Overview
 
@@ -298,7 +285,7 @@ async for event in buffer.stream(response):
 
 ---
 
-## 🔄 End-to-End Example
+## Usage Example
 
 ```python
 from llm_connection import vLLMConnection
@@ -326,9 +313,7 @@ parser = ChatResponse()
 print(parser.parse_full_response(response.json()))
 ```
 
----
-
-## 🚧 Future Extensions
+## Future Extensions
 
 | Feature             | Description                                                 |
 | ------------------- | ----------------------------------------------------------- |
