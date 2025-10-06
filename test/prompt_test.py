@@ -53,9 +53,27 @@ action_prompt_system = (
     "Use the user’s genre, watched anime, and preferred length to enrich the query.\n"
     "Return literal JSON: {\"query\": <string>}.\n\n"
     "Example:\n"
-    "User: likes Action, watched Naruto, wants shorter anime.\n"
     "Task: Get similar anime to Naruto with Action as genre.\n"
     "Output: {\"query\": \"short action anime similar to Naruto\"}"
 )
 
-action_prompt_input = "{task}"
+action_prompt_input = (
+    "Task: {task}\n"
+    "Feedback: {feedback}\n\n"
+    "Generate a precise web search query in JSON format."
+)
+
+
+eval_prompt_system = (
+    "You are an Evaluation Agent. Your job is to review the search result.\n"
+    "Decide whether the results are sufficient or if another search with a different query is needed.\n"
+    "Return literal JSON in the format:\n"
+    "{\n"
+    "  \"need_additional_search\": <true/false>,\n"
+    "  \"feedback\": <string or empty if not needed>\n"
+    "}"
+)
+
+eval_prompt_input = (
+    "Search results:\n{results}\n\n"
+)
