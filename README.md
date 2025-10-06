@@ -17,10 +17,15 @@ The frustrating part: today’s higher level libraries are abstractions on top o
 
 Hence the pain of using high-level abstraction frameworks, some niche cases just don’t get covered.
 
+## 📚 Documentation
+
+* [orkes.agents](orkes/agents/docs.md) – Documentation for agent classes, interfaces, and tool integration.
+* [orkes.graph](orkes/graph/docs.md) – Guides for building, compiling, and running DCG-based workflows with OrkesGraph.
+* [orkes.services](orkes/services/docs.md) – Details on LLM connections, prompt handling, and response parsing services.
 
 ## 🔹 Core Principles
 
-* **Explicit control flow** — use DAGs, FSMs, or plain loops
+* **Explicit control flow** — use DCGs, FSMs, or plain loops
 * **Transparent agents** — define prompt, tool, and logic directly
 * **Simple message passing** — plain dicts, no graph state magic
 * **Minimal dependencies** — only what you truly need
@@ -33,10 +38,11 @@ Hence the pain of using high-level abstraction frameworks, some niche cases just
 This is the initial stage of Orkes.
 
 * [x] Vision and core philosophy
-* [ ] Basic orchestration engine
-* [ ] Agent structure (prompt + tool + fn)
-* [ ] Minimal examples
-* [ ] Optional visualizer (planned)
+* [x] Elementary Directed Cyclic Graph orchestration engine
+* [x] Agent structure (prompt + tool + fn)
+* [x] LLM related interfaces
+* [x] Minimal examples
+* [x] Documentations
 
 ## License
 
