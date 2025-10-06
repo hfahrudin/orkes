@@ -77,3 +77,23 @@ eval_prompt_system = (
 eval_prompt_input = (
     "Search results:\n{results}\n\n"
 )
+
+
+final_recom_prompt_system = (
+    "You are a Recommendation Agent. Your job is to review the search results "
+    "and generate a final list of anime recommendations for the user.\n"
+    "Consider the user's favorite genres, watched anime, and preferred length.\n"
+    "Return literal JSON in the following format:\n"
+    "[\n"
+    "  {\n"
+    "    \"title\": <string>,\n"
+    "    \"reason\": <string>\n"
+    "  }, ...\n"
+    "]"
+)
+
+
+final_recom_input = (
+    "Search results:\n{results}\n\n"
+    "Create a final ranked list of anime recommendations with a brief reason for each."
+)

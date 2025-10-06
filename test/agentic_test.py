@@ -2,7 +2,7 @@ from duckduckgo_search import DDGS
 #FOR LOCAL TESTING
 import sys
 import os
-from prompt_test import planner_prompt_system, planner_prompt_input, action_prompt_system, action_prompt_input, eval_prompt_system, eval_prompt_input
+from prompt_test import *
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from orkes.graph.core import OrkesGraph
@@ -41,7 +41,6 @@ class State(TypedDict):
     query: str
     user_profile: dict
     search_results: list
-    personalized_evaluation: dict
     final_recommendations: list
     feedback: str
     plan :list
@@ -161,6 +160,23 @@ def conditional_node(state: State):
         return 'RETRY'  # name o
     
 def exit_node(state: State):
+    search_results = state['search_results']
+    cR = ChatResponse()
+    cP = ChatPromptHandler(system_prompt_template=final_recom_prompt_system, user_prompt_template=final_recom_input)
+    queries = {
+        "system" : {
+        },
+        "user" : {
+            "results" : search_results
+        }
+    }
+
+    planner_agent = Agent(name="agent_2", prompt_handler=cP, llm_connection=connection, response_handler=cR)
+    res = planner_agent.invoke(queries=queries)
+    raw = res["choices"][0]['message']['content']
+    final_recommendations = extract_json(raw)
+
+    state['final_recommendations'] = final_recommendations
     return state
 
 # ------------------ Graph Definition ------------------ #
@@ -175,27 +191,32 @@ agent_graph.add_node('planner_node', planner_node)
 agent_graph.add_node('eval_node', eval_node)
 agent_graph.add_node('exit_node', exit_node)
 
-agent_graph.add_edge(START_node, 'planner_node')
-agent_graph.add_edge('planner_node', 'action_node')
-agent_graph.add_edge('action_node', 'eval_node')
-agent_graph.add_conditional_edge('eval_node', conditional_node, {'DONE' : 'exit_node', 'RETRY' : 'action_node'})
+agent_graph.add_edge(START_node, 'planner_node', max_passes=5)
+agent_graph.add_edge('planner_node', 'action_node', max_passes=5)
+agent_graph.add_edge('action_node', 'eval_node', max_passes=5)
+agent_graph.add_conditional_edge('eval_node', conditional_node, {'DONE' : 'exit_node', 'RETRY' : 'action_node'}, max_passes=5)
 agent_graph.add_edge('exit_node', END_node)
 
+runner = agent_graph.compile()
 
 # ------------------ Test Execution ------------------ #
 
-
 query = "recommend me some anime similar to Inuyasha"
+
 user_profile = {
     "favorite_genres": ["Fantasy", "Adventure", "Romance"],
     "watched_anime": ["Naruto", "Bleach", "Inuyasha"],
     "preferred_length": "short_to_medium"
 }
 
-planner_context = {
-    "user_query": query,
+state = {
+    "query": query,
     "user_profile": user_profile,
-    "available_tools": ["DDGS_search", "filter_and_rank", "evaluate_personalization", "format_response"],
-    "goals": "Recommendations must be personalized and avoid duplicates, present at least 3 results, and rank by genre similarity.",
-    "output_format": "JSON plan for action agent execution"
+    "search_results": [],
+    "final_recommendations": [],
+    "feedback" : "",
+    "plan" : [],
+    "status" : "DONE"
 }
+
+result= runner.run(state)

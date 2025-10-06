@@ -35,7 +35,7 @@ class OrkesGraph:
         self._nodes_pool[name] = NodePoolItem(node=Node(name, func, self.state))
 
 
-    def add_edge(self, from_node: Union[str, _StartNode], to_node: Union[str, _EndNode]) -> None:
+    def add_edge(self, from_node: Union[str, _StartNode], to_node: Union[str, _EndNode], max_passes: int = 25) -> None:
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
 
@@ -43,7 +43,7 @@ class OrkesGraph:
 
         to_node_item = self._validate_to_node(to_node)
 
-        edge = ForwardEdge(from_node_item, to_node_item)
+        edge = ForwardEdge(from_node_item, to_node_item, max_passes=max_passes)
 
         self._nodes_pool[from_node_item.node.name].edge = edge
         self._edges_pool.append(edge)
@@ -52,7 +52,7 @@ class OrkesGraph:
             to_node_item.edge = "<END GRAPH TOKEN>"
 
 
-    def add_conditional_edge(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, str]):
+    def add_conditional_edge(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, str], max_passes: int = 25):
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
         
@@ -65,7 +65,7 @@ class OrkesGraph:
 
         self._validate_condition(condition)
 
-        edge = ConditionalEdge(from_node_item, gate_function, condition)
+        edge = ConditionalEdge(from_node_item, gate_function, condition, max_passes=max_passes)
         self._edges_pool.append(edge)
         self._nodes_pool[from_node_item.node.name].edge = edge
 
