@@ -2,12 +2,13 @@ from duckduckgo_search import DDGS
 #FOR LOCAL TESTING
 import sys
 import os
-from prompt_test import planner_prompt_system, planner_prompt_input
+from prompt_test import planner_prompt_system, planner_prompt_input, action_prompt_system, action_prompt_input
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from orkes.graph.core import OrkesGraph
 from typing import TypedDict
-from orkes.agents.core import Agent
+from orkes.agents.core import Agent, ToolAgent
+from orkes.agents.actions import ActionBuilder
 from orkes.services.connections import vLLMConnection
 from orkes.services.prompts import ChatPromptHandler
 from orkes.services.responses import ChatResponse
@@ -64,10 +65,7 @@ def search(query, max_results=10):
 # ------------------ Node Definition ------------------ #
 
 #Entry Node
-def entry_node(state: State):
-    result = state.get('initial', 0) + 3
-    state['add_result'] = result
-    return state
+
 
 #Planner Node
 def planner_node(state: State):
@@ -93,7 +91,36 @@ def planner_node(state: State):
 
 
 #Action Node -> Search Queries, Result Aggregation, and Recommendation
+def action_node(state: State):
+    plans = state['plan']
+    for p in plans:
+        agent = p["agent"]
+        task = p["task"]
+        if agent == "SearchEngine":
+            result = search_engine_agent(task) 
+            state['search_results'].append(result)
+    return state
 
+
+def search_engine_agent(task):
+    """
+    Executes the plan using ToolAgent with a single search tool.
+    Uses DuckDuckGo Search (DDGS) to gather information according to the plan.
+    """
+    cR = ChatResponse()
+    cP = ChatPromptHandler(system_prompt_template=action_prompt_system, user_prompt_template=action_prompt_input)
+    queries = {
+        "system" : {
+        },
+        "user" : {
+            "task" : task
+        }
+    }
+    planner_agent = Agent(name="agent_0", prompt_handler=cP, llm_connection=connection, response_handler=cR)
+    res = planner_agent.invoke(queries=queries)
+    raw = res["choices"][0]['message']['content']
+    query = extract_json(raw)
+    return query
 #Eval Node
 
 #Exit Node

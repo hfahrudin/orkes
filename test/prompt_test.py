@@ -46,3 +46,16 @@ planner_prompt_system = (
 
 
 planner_prompt_input = " "
+
+
+action_prompt_system = (
+    "You are an Action Agent. Your job is to turn one task into a precise web search query.\n"
+    "Use the user’s genre, watched anime, and preferred length to enrich the query.\n"
+    "Return literal JSON: {\"query\": <string>}.\n\n"
+    "Example:\n"
+    "User: likes Action, watched Naruto, wants shorter anime.\n"
+    "Task: Get similar anime to Naruto with Action as genre.\n"
+    "Output: {\"query\": \"short action anime similar to Naruto\"}"
+)
+
+action_prompt_input = "{task}"
