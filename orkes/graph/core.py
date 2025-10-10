@@ -35,7 +35,7 @@ class OrkesGraph:
         self._nodes_pool[name] = NodePoolItem(node=Node(name, func, self.state))
 
 
-    def add_edge(self, from_node: Union[str, _StartNode], to_node: Union[str, _EndNode]) -> None:
+    def add_edge(self, from_node: Union[str, _StartNode], to_node: Union[str, _EndNode], max_passes: int = 25) -> None:
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
 
@@ -43,7 +43,7 @@ class OrkesGraph:
 
         to_node_item = self._validate_to_node(to_node)
 
-        edge = ForwardEdge(from_node_item, to_node_item)
+        edge = ForwardEdge(from_node_item, to_node_item, max_passes=max_passes)
 
         self._nodes_pool[from_node_item.node.name].edge = edge
         self._edges_pool.append(edge)
@@ -52,7 +52,7 @@ class OrkesGraph:
             to_node_item.edge = "<END GRAPH TOKEN>"
 
 
-    def add_conditional_edges(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, Union[str, Node]]):
+    def add_conditional_edge(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, str], max_passes: int = 25):
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
         
@@ -65,7 +65,7 @@ class OrkesGraph:
 
         self._validate_condition(condition)
 
-        edge = ConditionalEdge(from_node_item, gate_function, condition)
+        edge = ConditionalEdge(from_node_item, gate_function, condition, max_passes=max_passes)
         self._edges_pool.append(edge)
         self._nodes_pool[from_node_item.node.name].edge = edge
 
@@ -92,6 +92,8 @@ class OrkesGraph:
         if not (isinstance(from_node, str) or from_node is self.START ):
             raise TypeError(f"'from_node' must be str or START, got {type(from_node)}")
 
+        #TODO : node need to return graph (?)
+        
         if isinstance(from_node, str):
             if from_node not in self._nodes_pool:
                 raise ValueError(f"From node '{from_node}' does not exist")
@@ -117,21 +119,23 @@ class OrkesGraph:
         return to_node_item
 
     def compile(self):
-        #check nodes need to have branch
         #check start point inttegrity
         if not self._nodes_pool['START'].edge:
             raise RuntimeError("The Graph entry point is not assigned")
 
-        #check all conditional
-        #checkk all fallback
+        #TODO: check all conditional
+        #TODO: checkk all fallback
+
         #check end point integrity
         if not self._nodes_pool['END'].edge:
             raise RuntimeError("The Graph end point is not assigned")
+        
         #should have all exit node
         for edge in self._edges_pool:
             if edge.edge_type == "__forward__":
                 if not edge.to_node:
                     raise RuntimeError(f"Edge {edge.id} do not have node destination")
+            #TODO: Conditional check
             elif edge.edge_type == "__conditional__":
                 pass
         for node_name, node in self._nodes_pool.items():
@@ -139,7 +143,7 @@ class OrkesGraph:
                 raise RuntimeError(f"Node '{node_name}' has an empty edge.")
         self._freeze = True
         
-        return GraphRunner(nodes_pool=self._nodes_pool, graph_state=self.state)
+        return GraphRunner(nodes_pool=self._nodes_pool, graph_type=self.state)
     
     def detect_loop(self):
         start_pool = self._nodes_pool['START']
@@ -161,28 +165,4 @@ class OrkesGraph:
                 return True
 
         path.remove(current_node_name)
-        print(path)
         return False
-
-# function example
-# "function with state argument + agent is the agreed node"
-# # Test classes
-# class MyState:
-#     pass
-
-# # Test functions
-# def generate_file(state: MyState, x: int):
-#     pass
-
-
-#Graph feature:
-# DAG, able to cycle, sequential, conditional. 
-#Runner functions: TODO: gambar graph
-#Notes:
-
-# # Graph state
-# class State(TypedDict):
-#     topic: str
-#     joke: str
-#     improved_joke: str
-#     final_joke: str
