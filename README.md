@@ -1,7 +1,7 @@
 
 <h2 align="center">
-  <img width="15%" alt="Model2Vec logo" src="assets/orkes.png"><br/>
-  No abstractions. No black boxes. Just your agent
+  <img width="23%" alt="Model2Vec logo" src="assets/orkes.png"><br/>
+  No abstractions. No black boxes. Just your Agent
 </h2>
 
 
