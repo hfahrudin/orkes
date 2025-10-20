@@ -1,9 +1,13 @@
-# Orkes
+
+<h2 align="center">
+  <img width="15%" alt="Model2Vec logo" src="assets/orkes.png"><br/>
+  No abstractions. No black boxes. Just your agent
+</h2>
+
 
 ## 🔍 What is Orkes?
 
-**Orkes** helps you coordinate LLM agents using plain Python.
-No magic, no unnecessary layers. Just **explicit control flow**, **transparent agent logic**, and **simple message passing**.
+**Orkes** helps you coordinate LLM agents using plain Python, emphasizing **explicit control flow**, **transparent agent logic**, and **simple message passing**.
 
 ## 📝 Background
 
