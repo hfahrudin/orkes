@@ -216,7 +216,8 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
         
         return {
             "contents": gemini_contents,
-            "generationConfig": settings
+            "generationConfig": settings,
+            "stream": stream
         }
 
     def parse_response(self, response_data: Dict) -> str:
@@ -226,8 +227,16 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
             return ""
 
     def parse_stream_chunk(self, line: str) -> Optional[str]:
-        # Google streaming is raw JSON array elements usually, logic depends heavily on endpoint
-        return None  # Placeholder: Google streaming via raw REST is complex
+        if not line.startswith("data: "):
+            return None
+        data_str = line[6:]
+        if not data_str:
+            return None
+        try:
+            data = json.loads(data_str)
+            return data['candidates'][0]['content']['parts'][0]['text']
+        except (json.JSONDecodeError, KeyError, IndexError):
+            return None
 
 
 
@@ -244,8 +253,16 @@ class UniversalLLMClient(LLMInterface):
             settings.update(overrides)
         return settings
 
-    def send(self, messages: List[Dict[str, str]], endpoint: str = "/chat/completions", **kwargs) -> Dict:
+    def send_message(self, messages: List[Dict[str, str]], endpoint: str = None, **kwargs) -> Dict:
         """Synchronous Send"""
+        if endpoint is None:
+            if isinstance(self.provider, GoogleGeminiStrategy):
+                endpoint = f"/models/{self.config.model}:generateContent"
+            elif isinstance(self.provider, AnthropicStrategy):
+                endpoint = "/messages"
+            else:
+                endpoint = "/chat/completions"
+
         full_url = f"{self.config.base_url}{endpoint}"
         payload = self.provider.prepare_payload(
             self.config.model, 
@@ -272,8 +289,16 @@ class UniversalLLMClient(LLMInterface):
             # logging.error(f"Request failed: {e}")
             raise
 
-    async def stream(self, messages: List[Dict[str, str]], endpoint: str = "/chat/completions", **kwargs) -> AsyncGenerator[str, None]:
+    async def stream_message(self, messages: List[Dict[str, str]], endpoint: str = None, **kwargs) -> AsyncGenerator[str, None]:
         """Asynchronous Streaming"""
+        if endpoint is None:
+            if isinstance(self.provider, GoogleGeminiStrategy):
+                endpoint = f"/models/{self.config.model}:generateContent"
+            elif isinstance(self.provider, AnthropicStrategy):
+                endpoint = "/messages"
+            else:
+                endpoint = "/chat/completions"
+
         full_url = f"{self.config.base_url}{endpoint}"
         payload = self.provider.prepare_payload(
             self.config.model, 
@@ -293,7 +318,6 @@ class UniversalLLMClient(LLMInterface):
                     decoded_line = line.decode('utf-8').strip()
                     if not decoded_line:
                         continue
-                    
                     text_chunk = self.provider.parse_stream_chunk(decoded_line)
                     if text_chunk:
                         yield text_chunk
@@ -309,31 +333,40 @@ class UniversalLLMClient(LLMInterface):
 
 class LLMFactory:
     @staticmethod
-    def create_vllm(url: str, model: str, api_key: str = "EMPTY") -> UniversalLLMClient:
+    def create_vllm(url: str, model: str, api_key: str = "EMPTY", base_url: str = None) -> UniversalLLMClient:
         config = LLMConfig(
             api_key=api_key,
-            base_url=url,
+            base_url=base_url or url,
             model=model
         )
         return UniversalLLMClient(config, OpenAIStyleStrategy())
 
     @staticmethod
-    def create_openai(api_key: str, model: str = "gpt-4") -> UniversalLLMClient:
+    def create_openai(api_key: str, model: str = "gpt-4", base_url: str = "https://api.openai.com/v1") -> UniversalLLMClient:
         config = LLMConfig(
             api_key=api_key,
-            base_url="https://api.openai.com/v1",
+            base_url=base_url,
             model=model
         )
         return UniversalLLMClient(config, OpenAIStyleStrategy())
 
     @staticmethod
-    def create_anthropic(api_key: str, model: str = "claude-3-opus-20240229") -> UniversalLLMClient:
+    def create_anthropic(api_key: str, model: str = "claude-3-opus-20240229", base_url: str = "https://api.anthropic.com/v1") -> UniversalLLMClient:
         config = LLMConfig(
             api_key=api_key,
-            base_url="https://api.anthropic.com/v1",
+            base_url=base_url,
             model=model
         )
         return UniversalLLMClient(config, AnthropicStrategy())
+    
+    @staticmethod
+    def create_gemini(api_key: str, model: str = "gemini-pro", base_url: str = "https://generativelanguage.googleapis.com/v1beta") -> UniversalLLMClient:
+        config = LLMConfig(
+            api_key=api_key,
+            base_url=base_url,
+            model=model
+        )
+        return UniversalLLMClient(config, GoogleGeminiStrategy())
     
 
 
@@ -356,7 +389,7 @@ class LLMFactory:
 
 #     print("--- vLLM Sync Response ---")
 #     try:
-#         response = vllm_client.send(messages)
+#         response = vllm_client.send_message(messages)
 #         print(response['content'])
 #     except Exception as e:
 #         print(f"vLLM connection failed (expected if no server running): {e}")
@@ -364,7 +397,7 @@ class LLMFactory:
 #     print("\n--- OpenAI Stream Response ---")
 #     # This assumes you have a valid key, otherwise it will error gracefully
 #     try:
-#         async for chunk in openai_client.stream(messages):
+#         async for chunk in openai_client.stream_message(messages):
 #             print(chunk, end="", flush=True)
 #     except Exception as e:
 #         print(f"OpenAI connection failed: {e}")
