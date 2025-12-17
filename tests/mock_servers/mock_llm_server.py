@@ -94,23 +94,24 @@ async def gemini_stream_generator():
 
 @app.post("/v1beta/models/{model}:generateContent")
 async def generate_gemini_content(model: str, request: GeminiRequest):
-    if request.stream:
-        return StreamingResponse(gemini_stream_generator(), media_type="application/x-ndjson")
-    else:
-        return {
-            "candidates": [
-                {
-                    "content": {"parts": [{"text": "Hello from Gemini, how can I help you today?"}], "role": "model"},
-                    "finishReason": "STOP",
-                    "index": 0,
-                    "safetyRatings": [
-                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "probability": "NEGLIGIBLE"},
-                        {"category": "HARM_CATEGORY_HATE_SPEECH", "probability": "NEGLIGIBLE"},
-                    ],
-                }
-            ],
-            "promptFeedback": {"safetyRatings": [{"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "probability": "NEGLIGIBLE"}]}
-        }
+    return {
+        "candidates": [
+            {
+                "content": {"parts": [{"text": "Hello from Gemini, how can I help you today?"}], "role": "model"},
+                "finishReason": "STOP",
+                "index": 0,
+                "safetyRatings": [
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "probability": "NEGLIGIBLE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "probability": "NEGLIGIBLE"},
+                ],
+            }
+        ],
+        "promptFeedback": {"safetyRatings": [{"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "probability": "NEGLIGIBLE"}]}
+    }
+    
+@app.post("/v1beta/models/{model}:streamGenerateContent")
+async def generate_gemini_content(model: str, request: GeminiRequest):
+    return StreamingResponse(gemini_stream_generator(), media_type="application/x-ndjson")
 
 # --- Claude ---
 

@@ -133,6 +133,11 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
         }
 
     def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict) -> Dict:
+
+        allowed_keys = {"temperature", "max_tokens", "top_p", "top_k", "stop"}
+        actual_keys = set(settings.keys())
+        assert actual_keys.issubset(allowed_keys), f"Invalid keys found: {actual_keys - allowed_keys}"
+        
         return {
             "model": model,
             "messages": messages,
@@ -202,7 +207,10 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
     def get_headers(self, api_key: str) -> Dict[str, str]:
         # Google often passes API key via query param, but can use header for some setups.
         # This implementation assumes standard REST approach; SDK use is usually preferred for Google.
-        return {"Content-Type": "application/json"}
+        return {
+            'X-goog-api-key': api_key,
+            "Content-Type": "application/json"
+        }
 
     def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict) -> Dict:
         # Simplistic mapping to Google's "contents" format
@@ -213,11 +221,19 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
                 "role": role,
                 "parts": [{"text": msg['content']}]
             })
+
+        if "max_tokens" in settings:
+            settings["max_output_tokens"] = settings.pop("max_tokens")
+
+        allowed_keys = {"temperature", "max_output_tokens", "top_p", "top_k", "stop_sequences"}
+        actual_keys = set(settings.keys())
+
+        # Checks if actual_keys is a subset of allowed_keys
+        assert actual_keys.issubset(allowed_keys), f"Invalid keys found: {actual_keys - allowed_keys}"
         
         return {
             "contents": gemini_contents,
-            "generationConfig": settings,
-            "stream": stream
+            "generation_config": settings
         }
 
     def parse_response(self, response_data: Dict) -> str:
@@ -273,8 +289,8 @@ class UniversalLLMClient(LLMInterface):
 
         # Special handling for Google which uses query params for API key sometimes
         params = {}
-        if isinstance(self.provider, GoogleGeminiStrategy):
-            params['key'] = self.config.api_key
+        # if isinstance(self.provider, GoogleGeminiStrategy):
+        #     params['key'] = self.config.api_key
 
         try:
             response = requests.post(full_url, headers=self.session_headers, json=payload, params=params)
@@ -293,7 +309,7 @@ class UniversalLLMClient(LLMInterface):
         """Asynchronous Streaming"""
         if endpoint is None:
             if isinstance(self.provider, GoogleGeminiStrategy):
-                endpoint = f"/models/{self.config.model}:generateContent"
+                endpoint = f"/models/{self.config.model}:streamGenerateContent"
             elif isinstance(self.provider, AnthropicStrategy):
                 endpoint = "/messages"
             else:
@@ -308,8 +324,6 @@ class UniversalLLMClient(LLMInterface):
         )
 
         params = {}
-        if isinstance(self.provider, GoogleGeminiStrategy):
-            params['key'] = self.config.api_key
 
         async with aiohttp.ClientSession() as session:
             async with session.post(full_url, headers=self.session_headers, json=payload, params=params) as response:
@@ -360,7 +374,7 @@ class LLMFactory:
         return UniversalLLMClient(config, AnthropicStrategy())
     
     @staticmethod
-    def create_gemini(api_key: str, model: str = "gemini-pro", base_url: str = "https://generativelanguage.googleapis.com/v1beta") -> UniversalLLMClient:
+    def create_gemini(api_key: str, model: str = "gemini-2.0-flash", base_url: str = "https://generativelanguage.googleapis.com/v1beta") -> UniversalLLMClient:
         config = LLMConfig(
             api_key=api_key,
             base_url=base_url,

@@ -48,8 +48,8 @@ def test_openai_chat_completions_streaming(mock_server):
 
 def test_gemini_generate_content_streaming(mock_server):
     response = requests.post(
-        f"{mock_server}/v1beta/models/gemini-pro:generateContent",
-        json={"contents": [{"parts": [{"text": "Hello!"}]}], "stream": True},
+        f"{mock_server}/v1beta/models/gemini-pro:streamGenerateContent",
+        json={"contents": [{"parts": [{"text": "Hello!"}]}]},
         stream=True
     )
     assert response.status_code == 200
