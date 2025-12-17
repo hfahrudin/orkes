@@ -4,7 +4,6 @@ import requests
 from requests import Response
 import json
 import aiohttp
-from warnings import deprecated
 
 class LLMConfig:
     """Universal configuration object for any LLM connection."""
@@ -73,7 +72,6 @@ class LLMInterface(ABC):
         pass
 
 
-@deprecated("Use UniversalLLMClient instead")
 class vLLMConnection(LLMInterface):
     """
     LEGACY: This class is maintained for backward compatibility only.
