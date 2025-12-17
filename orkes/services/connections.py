@@ -4,7 +4,7 @@ import requests
 from requests import Response
 import json
 import aiohttp
-
+from warnings import deprecated
 
 class LLMConfig:
     """Universal configuration object for any LLM connection."""
@@ -72,9 +72,16 @@ class LLMInterface(ABC):
         """Check the server's health status."""
         pass
 
-#TODO: create more universal Interface
 
+@deprecated("Use UniversalLLMClient instead")
 class vLLMConnection(LLMInterface):
+    """
+    LEGACY: This class is maintained for backward compatibility only.
+    
+    .. 
+       Use :class:`LLMFactory` for prebuilt connection or create your connection using `UniversalLLMClient`. 
+       vLLMConnection uses the OpenAI-compatible format which is being phased out.
+    """
     def __init__(self, url: str, model_name = str, headers: Optional[Dict[str, str]] = None, api_key = None):
         self.url = url
         self.headers = headers.copy() if headers else {"Content-Type": "application/json"}

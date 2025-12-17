@@ -7,3 +7,4 @@ orkes.egg-info/
 upload.py
 .env
 legacy/
+.pytest_cache
