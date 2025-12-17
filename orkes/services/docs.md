@@ -1,4 +1,3 @@
-
 # orkes.services
 
 This documentation covers the three foundational components of the **LLM Core Layer**:
@@ -13,6 +12,12 @@ Together, they form the base for building **LLM-driven agent pipelines** or **cu
 1. [Architecture Overview](#architecture-overview)
 2. [Prompt Handler](#prompt-handler)
 3. [LLM Connection](#llm-connection)
+    * [Overview](#overview-1)
+    * [Class Diagram](#class-diagram-1)
+    * [LLMConfig](#llmconfig)
+    * [LLMProviderStrategy](#llmproviderstrategy)
+    * [UniversalLLMClient](#universalllmclient)
+    * [LLMFactory](#llmfactory)
 4. [Response Parser](#response-parser)
 5. [Usage Example](#usage-example)
 6. [Future Extensions](#future-extensions)
@@ -20,218 +25,212 @@ Together, they form the base for building **LLM-driven agent pipelines** or **cu
 
 ## Architecture Overview
 
-```
-┌──────────────────────────────┐
-│        Prompt Handler        │
-│  (System/User Message Gen)   │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│       LLM Connection         │
-│ (Send / Stream / HealthCheck)│
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│       Response Parser        │
-│ (Parse Stream / Full Output) │
-└──────────────────────────────┘
-```
+The `LLM Connection` layer in Orkes provides two primary abstractions for interacting with Large Language Models (LLMs):
 
-Each layer can be **independently extended** (e.g. adding support for OpenAI, Claude, or Mistral).
+1.  **`vLLMConnection` (Legacy)**: A specific implementation designed for direct integration with vLLM (OpenAI-compatible) servers. It offers basic synchronous and asynchronous communication.
+2.  **`UniversalLLMClient` (Modern & Extensible)**: A more flexible, strategy-pattern-based client that unifies interaction with various LLM providers, including OpenAI-compatible services, Google Gemini, and Anthropic Claude. It abstracts away provider-specific details, allowing for seamless switching between models and easy extension to new providers.
 
+This architecture enables:
 
-## Prompt Handler
-
-### Overview
-
-The **Prompt Handler** generates structured message payloads for chat-based LLMs, supporting **templated prompts** with runtime variable substitution.
-
-Used to construct messages like:
-
-```python
-[
-  {"role": "system", "content": "..."},
-  {"role": "user", "content": "..."}
-]
-```
-### Class Diagram
-
-```
-PromptInterface (ABC)
-│
-└── ChatPromptHandler
-       ├── gen_messages(queries, chat_history)
-       ├── _format_prompt(template, values)
-       └── get_all_keys()
-```
-
-
-### `PromptInterface`
-
-Abstract base class defining required prompt operations.
-
-| Method                                     | Description                                     |
-| ------------------------------------------ | ----------------------------------------------- |
-| `gen_messages(queries, chat_history=None)` | Generate full chat message payloads             |
-| `get_all_keys()`                           | Return expected placeholder keys from templates |
-
-### `ChatPromptHandler`
-
-Concrete implementation for **chat-based LLM prompts**.
-
-| Parameter                | Type  | Description                    |
-| ------------------------ | ----- | ------------------------------ |
-| `system_prompt_template` | `str` | Template for the system prompt |
-| `user_prompt_template`   | `str` | Template for the user prompt   |
-
-**Example:**
-
-```python
-handler = ChatPromptHandler(
-    system_prompt_template="{persona}. Respond concisely and helpfully.",
-    user_prompt_template="{language}{input}"
-)
-```
-
-**Generated messages:**
-
-```python
-queries = {
-    "system": {"persona": "You are a support assistant."},
-    "user": {"language": "English: ", "input": "Explain transformers briefly."}
-}
-
-messages = handler.gen_messages(queries)
-```
-
-Output:
-
-```python
-[
-  {"role": "system", "content": "You are a support assistant. Respond concisely and helpfully."},
-  {"role": "user", "content": "English: Explain transformers briefly."}
-]
-```
-
-## LLM Connection
-
-### Overview
-
-Defines the **core communication layer** for interacting with model APIs (like OpenAI-compatible vLLM servers).
-
-Supports:
-
-* Sync message sending
-* Async streaming
-* Health checks
-* Configurable generation parameters
-
----
+*   **Unified API Interaction**: Use a single client to communicate with multiple LLM providers.
+*   **Synchronous and Asynchronous Operations**: Supports both `send_message` (for full responses) and `stream_message` (for incremental token streaming).
+*   **Extensibility**: Easily add support for new LLM providers by implementing new `LLMProviderStrategy` classes.
+*   **Configurable Parameters**: Control generation parameters (e.g., temperature, max_tokens) on a per-request basis.
+*   **Health Checks**: Monitor the availability of LLM services.
 
 ### Class Diagram
 
-```
-LLMInterface (ABC)
-│
-└── vLLMConnection
-      ├── send_message()
-      ├── stream_message()
-      └── health_check()
-```
+```mermaid
+classDiagram
+    direction LR
 
----
+    class LLMInterface{
+        <<abstract>>
+        +send_message()
+        +stream_message()
+        +health_check()
+    }
 
-### `LLMInterface`
+    class LLMConfig {
+        +api_key: str
+        +base_url: str
+        +model: str
+        +headers: Dict
+        +default_params: Dict
+    }
 
-Abstract base defining required methods for all connection types.
+    class LLMProviderStrategy {
+        <<abstract>>
+        +prepare_payload()
+        +parse_response()
+        +parse_stream_chunk()
+        +get_headers()
+    }
 
-| Method                    | Description               |
-| ------------------------- | ------------------------- |
-| `send_message(message)`   | Send synchronous requests |
-| `stream_message(message)` | Async stream handling     |
-| `health_check()`          | Server health validation  |
+    class OpenAIStyleStrategy
+    class AnthropicStrategy
+    class GoogleGeminiStrategy
 
----
+    LLMProviderStrategy <|-- OpenAIStyleStrategy
+    LLMProviderStrategy <|-- AnthropicStrategy
+    LLMProviderStrategy <|-- GoogleGeminiStrategy
 
-### `vLLMConnection`
+    class UniversalLLMClient {
+        +config: LLMConfig
+        +provider: LLMProviderStrategy
+        +send_message()
+        +stream_message()
+        +health_check()
+    }
+    LLMInterface <|-- UniversalLLMClient
+    UniversalLLMClient "1" *-- "1" LLMConfig
+    UniversalLLMClient "1" *-- "1" LLMProviderStrategy
 
-Implementation for **vLLM REST API**.
+    class vLLMConnection {
+        +url: str
+        +model_name: str
+        +send_message()
+        +stream_message()
+        +health_check()
+    }
+    LLMInterface <|-- vLLMConnection
 
-| Parameter    | Type   | Description                 |
-| ------------ | ------ | --------------------------- |
-| `url`        | `str`  | Base URL of the LLM service |
-| `model_name` | `str`  | Model identifier            |
-| `headers`    | `dict` | Custom HTTP headers         |
-| `api_key`    | `str`  | Optional API key            |
+    class LLMFactory {
+        +create_vllm()
+        +create_openai()
+        +create_anthropic()
+        +create_gemini()
+    }
 
-**Default settings:**
-
-```python
-{
-  "temperature": 0.2,
-  "top_p": 0.6,
-  "frequency_penalty": 0.2,
-  "presence_penalty": 0.0,
-  "seed": 22
-}
-```
-
----
-
-### Methods
-
-#### `send_message(message, end_point="/v1/chat/completions", settings=None)`
-
-Sends a synchronous POST request.
-
-```python
-resp = client.send_message(messages)
-print(resp.json())
-```
-
-#### `async stream_message(message, end_point="/v1/chat/completions", settings=None)`
-
-Streams incremental chunks.
-
-```python
-async for chunk in client.stream_message(messages):
-    print(chunk)
+    LLMFactory ..> UniversalLLMClient : creates
+    LLMFactory ..> vLLMConnection : creates (legacy)
 ```
 
-#### `health_check(end_point="/health")`
+### `LLMConfig`
 
-Simple GET check.
+A universal configuration object that holds essential parameters for any LLM connection.
 
-```python
-print(client.health_check().status_code)
-```
+| Parameter        | Type                       | Description                                         |
+| :--------------- | :------------------------- | :-------------------------------------------------- |
+| `api_key`        | `str`                      | API key for authentication with the LLM provider.   |
+| `base_url`       | `str`                      | Base URL of the LLM service endpoint.               |
+| `model`          | `str`                      | Identifier of the specific LLM model to use.        |
+| `extra_headers`  | `Optional[Dict[str, str]]` | Optional: Additional HTTP headers for requests.     |
+| `default_params` | `Optional[Dict[str, Any]]` | Optional: Default generation parameters (e.g., temperature, max_tokens). |
 
----
+### `LLMProviderStrategy` (ABC)
+
+An abstract base class that defines the interface for provider-specific logic. Concrete implementations of this strategy handle the unique payload structures, response parsing, and authentication headers for different LLM providers.
+
+**Key Responsibilities:**
+
+*   **`prepare_payload`**: Converts a standardized message format into the provider-specific JSON payload required by the LLM API.
+*   **`parse_response`**: Extracts the generated text content from a non-streaming API response.
+*   **`parse_stream_chunk`**: Parses individual chunks from a streaming API response to extract incremental text.
+*   **`get_headers`**: Provides the necessary authentication and content headers for the provider's API.
+
+**Concrete Implementations:**
+
+*   **`OpenAIStyleStrategy`**: For OpenAI, vLLM, and other OpenAI-compatible APIs.
+*   **`AnthropicStrategy`**: For Anthropic\'s Claude API.
+*   **`GoogleGeminiStrategy`**: For Google\'s Gemini API.
+
+### `UniversalLLMClient`
+
+The core client that utilizes an `LLMConfig` and an `LLMProviderStrategy` to interact with any configured LLM. It exposes a consistent API regardless of the underlying LLM provider.
+
+| Method                                                                   | Description                                                          |
+| :----------------------------------------------------------------------- | :------------------------------------------------------------------- |
+| `send_message(messages: List[Dict[str, str]], endpoint: str = None, **kwargs)` | Sends a synchronous request to the LLM and returns the full response. |
+| `stream_message(messages: List[Dict[str, str]], endpoint: str = None, **kwargs)` | Sends a request and asynchronously streams incremental text chunks from the LLM. |
+| `health_check(endpoint: str = "/health")`                                | Performs a health check on the LLM service.                           |
+
+### `LLMFactory`
+
+A static factory class for conveniently creating configured instances of `UniversalLLMClient` for various supported LLM providers.
+
+| Method                                                          | Description                                            |
+| :-------------------------------------------------------------- | :----------------------------------------------------- |
+| `create_vllm(url: str, model: str, api_key: str = "EMPTY", base_url: str = None)` | Creates a client for a vLLM (OpenAI-compatible) service. |
+| `create_openai(api_key: str, model: str = "gpt-4", base_url: str = "https://api.openai.com/v1")` | Creates a client for OpenAI models.                    |
+| `create_anthropic(api_key: str, model: str = "claude-3-opus-20240229", base_url: str = "https://api.anthropic.com/v1")` | Creates a client for Anthropic Claude models.          |
+| `create_gemini(api_key: str, model: str = "gemini-pro", base_url: str = "https://generativelanguage.googleapis.com/v1beta")` | Creates a client for Google Gemini models.             |
 
 ## 📤 Response Parser
 
 ### Overview
 
 Handles **streamed** and **non-streamed** model responses using flexible parser interfaces.
-
+<!-- 
 ---
 
 ### Class Diagram
 
-```
-ResponseInterface (ABC)
-│
-├── ChatResponse
-│     ├── parse_stream_response()
-│     ├── parse_full_response()
-│     └── _generate_event()
-│
-└── StreamResponseBuffer
-      ├── stream()
-      └── _is_buffer_full()
-```
+```mermaid
+classDiagram
+    direction LR
+
+    class LLMInterface{
+        <<abstract>>
+        +send_message()
+        +stream_message()
+        +health_check()
+    }
+
+    class LLMConfig {
+        +api_key: str
+        +base_url: str
+        +model: str
+        +headers: Dict
+        +default_params: Dict
+    }
+
+    class LLMProviderStrategy {
+        <<abstract>>
+        +prepare_payload()
+        +parse_response()
+        +parse_stream_chunk()
+        +get_headers()
+    }
+
+    class OpenAIStyleStrategy
+    class AnthropicStrategy
+    class GoogleGeminiStrategy
+
+    LLMProviderStrategy <|-- OpenAIStyleStrategy
+    LLMProviderStrategy <|-- AnthropicStrategy
+    LLMProviderStrategy <|-- GoogleGeminiStrategy
+
+    class UniversalLLMClient {
+        +config: LLMConfig
+        +provider: LLMProviderStrategy
+        +send_message()
+        +stream_message()
+        +health_check()
+    }
+    LLMInterface <|-- UniversalLLMClient
+    UniversalLLMClient "1" *-- "1" LLMConfig
+    UniversalLLMClient "1" *-- "1" LLMProviderStrategy
+
+    class vLLMConnection {
+        +url: str
+        +model_name: str
+        +send_message()
+        +stream_message()
+        +health_check()
+    }
+    LLMInterface <|-- vLLMConnection
+
+    class LLMFactory {
+        +create_vllm()
+        +create_openai()
+        +create_anthropic()
+        +create_gemini()
+    }
+
+    LLMFactory ..> UniversalLLMClient : creates
+    LLMFactory ..> vLLMConnection : creates (legacy)
+``` -->
 
 ---
 
@@ -263,6 +262,7 @@ Concrete implementation for **chat-style responses** (e.g. OpenAI/vLLM).
 
 ---
 
+
 ### `StreamResponseBuffer`
 
 Buffers streaming responses and yields formatted chunks.
@@ -288,38 +288,105 @@ async for event in buffer.stream(response):
 ## Usage Example
 
 ```python
-from llm_connection import vLLMConnection
-from prompt_handler import ChatPromptHandler
-from response_parser import ChatResponse, StreamResponseBuffer
+import asyncio
+from orkes.services.connections import LLMFactory
+from orkes.services.prompts import ChatPromptHandler
+from orkes.services.responses import ChatResponse
 
-# Step 1: Build prompts
-handler = ChatPromptHandler(
-    system_prompt_template="{persona}.",
-    user_prompt_template="{input}"
-)
+async def main():
+    # 1. Prepare messages using Prompt Handler
+    handler = ChatPromptHandler(
+        system_prompt_template="{persona}.",
+        user_prompt_template="{input}"
+    )
+    queries = {
+        "system": {"persona": "You are a creative assistant."},
+        "user": {"input": "Write a short haiku about autumn."}
+    }
+    messages = handler.gen_messages(queries)
 
-queries = {
-    "system": {"persona": "You are a creative assistant."},
-    "user": {"input": "Write a short haiku about autumn."}
-}
-messages = handler.gen_messages(queries)
+    # 2. Configure and use LLM Clients from LLMFactory
 
-# Step 2: Connect to model
-client = vLLMConnection("http://localhost:8000", "mistral-7b")
+    # --- OpenAI-compatible (e.g., vLLM or OpenAI) ---
+    print("\n--- OpenAI/vLLM Sync Response ---")
+    openai_client = LLMFactory.create_openai(
+        api_key="sk-...", # Replace with your actual OpenAI API key or "EMPTY" for vLLM
+        model="gpt-4o",
+        base_url="http://localhost:8000/v1" # Use mock server URL
+    )
+    try:
+        response_data = openai_client.send_message(messages)
+        print(response_data['content'])
+    except Exception as e:
+        print(f"OpenAI/vLLM sync connection failed: {e}")
 
-# Step 3: Stream results
-response = client.send_message(messages)
-parser = ChatResponse()
-print(parser.parse_full_response(response.json()))
+    print("\n--- OpenAI/vLLM Stream Response ---")
+    try:
+        stream_parser = ChatResponse()
+        async for chunk in openai_client.stream_message(messages):
+            # parse_stream_chunk needs to be implemented in ChatResponse
+            # For direct stream, you might process chunk raw or via helper
+            print(chunk, end="", flush=True)
+        print() # Newline after stream
+    except Exception as e:
+        print(f"OpenAI/vLLM stream connection failed: {e}")
+
+
+    # --- Google Gemini ---
+    print("\n--- Google Gemini Sync Response ---")
+    gemini_client = LLMFactory.create_gemini(
+        api_key="YOUR_GEMINI_API_KEY", # Replace with your actual Gemini API key
+        model="gemini-pro",
+        base_url="http://localhost:8000/v1beta" # Use mock server URL
+    )
+    try:
+        response_data = gemini_client.send_message(messages)
+        print(response_data['content'])
+    except Exception as e:
+        print(f"Google Gemini sync connection failed: {e}")
+    
+    print("\n--- Google Gemini Stream Response ---")
+    try:
+        async for chunk in gemini_client.stream_message(messages):
+            print(chunk, end="", flush=True)
+        print() # Newline after stream
+    except Exception as e:
+        print(f"Google Gemini stream connection failed: {e}")
+
+    # --- Anthropic Claude ---
+    print("\n--- Anthropic Claude Sync Response ---")
+    claude_client = LLMFactory.create_anthropic(
+        api_key="YOUR_ANTHROPIC_API_KEY", # Replace with your actual Anthropic API key
+        model="claude-3-opus-20240229",
+        base_url="http://localhost:8000/v1" # Use mock server URL
+    )
+    try:
+        response_data = claude_client.send_message(messages)
+        print(response_data['content'])
+    except Exception as e:
+        print(f"Anthropic Claude sync connection failed: {e}")
+
+    print("\n--- Anthropic Claude Stream Response ---")
+    try:
+        async for chunk in claude_client.stream_message(messages):
+            print(chunk, end="", flush=True)
+        print() # Newline after stream
+    except Exception as e:
+        print(f"Anthropic Claude stream connection failed: {e}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
 ```
 
 ## Future Extensions
 
-| Feature             | Description                                                 |
-| ------------------- | ----------------------------------------------------------- |
+| Feature             | Description                                          |
+| ------------------- | ---------------------------------------------------- |
 | Tool prompts        | Extend `PromptHandler` to include function calling contexts |
-| Async HTTP          | Replace `requests` with `aiohttp` in `vLLMConnection`       |
-| Unified errors      | Add standard error objects for failed responses             |
-| Advanced buffering  | Sentence-aware or token-based stream flush                  |
-| Template validation | Validate placeholders on initialization                     |
-| Multi-turn chaining | Stateful prompt evolution across turns                      |
+| Async HTTP          | Replace `requests` with `aiohttp` in `vLLMConnection`        |
+| Unified errors      | Add standard error objects for failed responses              |
+| Advanced buffering  | Sentence-aware or token-based stream flush           |
+| Template validation | Validate placeholders on initialization                      |
+| Multi-turn chaining | Stateful prompt evolution across turns                   |

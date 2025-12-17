@@ -1,4 +1,3 @@
-
 <h2 align="center">
   <img width="23%" alt="Model2Vec logo" src="assets/orkes.png"><br/>
   No abstractions. No black boxes. Just your Agent
@@ -37,18 +36,31 @@ Hence the pain of using high-level abstraction frameworks, some niche cases just
 * **Stateless by default** — you control memory and state
 * **Hackable and debuggable** — nothing hidden
 
+## 🧪 Testing
+
+The `tests/` directory contains various testing components to ensure the reliability and functionality of Orkes:
+
+*   **`tests/mock_servers/`**: Houses mock LLM servers that mimic the behavior of popular LLM providers like OpenAI (which also covers vLLM), Google Gemini, and Anthropic Claude. These mocks support both standard request/response and streaming interactions, enabling consistent testing without external API calls.
+*   **`tests/integration_test/`**: Contains integration tests that verify the `orkes.services.connections` module's ability to interface correctly with different LLM providers using the mock servers.
+*   **`tests/examples/`**: Provides runnable examples of how to use various Orkes components.
+
+To run all integration and example tests, use the provided script:
+
+```bash
+python tests/run_all_tests.py
+```
+
 ## 🛠️ Project Status
 
 This is the initial stage of Orkes.
 
 * [x] Vision and core philosophy
 * [x] Elementary Directed Cyclic Graph orchestration engine
-* [x] Agent structure (prompt + tool + fn)
-* [x] LLM related interfaces
+* [x] Controllable Agent structure (prompt + tool + fn)
+* [x] **LLM connection abstractions (OpenAI/vLLM, Gemini, Claude) with synchronous and asynchronous streaming support**
 * [x] Minimal examples
 * [x] Documentations
 
 ## License
 
 This poject is available as open source under the terms of the [MIT License](https://github.com/hfahrudin/orkes/blob/main/LICENSE).
-
