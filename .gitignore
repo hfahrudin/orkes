@@ -6,3 +6,4 @@ dist/
 orkes.egg-info/
 upload.py
 .env
+legacy/

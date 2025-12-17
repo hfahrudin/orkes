@@ -25,7 +25,7 @@ class LLMInterface(ABC):
         """Check the server's health status."""
         pass
 
-
+#TODO: create more universal Interface
 
 class vLLMConnection(LLMInterface):
     def __init__(self, url: str, model_name = str, headers: Optional[Dict[str, str]] = None, api_key = None):
