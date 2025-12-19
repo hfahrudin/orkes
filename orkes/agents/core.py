@@ -1,4 +1,4 @@
-from orkes.services.connections import LLMInterface
+from orkes.services.connectors import LLMInterface
 from orkes.services.prompts import PromptInterface
 from orkes.agents.actions import ActionBuilder
 from orkes.services.prompts import ChatPromptHandler

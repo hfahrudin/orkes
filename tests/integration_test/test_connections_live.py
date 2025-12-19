@@ -1,6 +1,6 @@
 import os
 import pytest
-from orkes.services.connections import LLMFactory
+from orkes.services.connectors import LLMFactory
 
 from dotenv import load_dotenv
 

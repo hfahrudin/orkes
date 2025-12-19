@@ -2,3 +2,5 @@ pydantic
 fastapi
 uvicorn
 python-dotenv
+pytest
+pytest-html
