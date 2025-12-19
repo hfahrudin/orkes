@@ -78,7 +78,7 @@ class vLLMConnection(LLMInterface):
         full_url = self.url + end_point
         return requests.get(full_url, headers=self.headers)
 
-
+#TODO: validate schema of responses of tools too
 class UniversalLLMClient(LLMInterface):
     def __init__(self, config: LLMConfig, provider: LLMProviderStrategy):
         self.config = config
