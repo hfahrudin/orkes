@@ -4,6 +4,7 @@ import requests
 from requests import Response
 import json
 import aiohttp
+from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
 
 class LLMConfig:
     """Universal configuration object for any LLM connection."""
@@ -31,7 +32,7 @@ class LLMProviderStrategy(ABC):
     """
     
     @abstractmethod
-    def prepare_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, settings: Dict) -> Dict:
+    def prepare_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, tools: Optional[List[Dict]], settings: Dict) -> Dict:
         """Convert standard messages to provider-specific JSON payload."""
         pass
 
@@ -126,141 +127,6 @@ class vLLMConnection(LLMInterface):
         return requests.get(full_url, headers=self.headers)
 
 
-
-class OpenAIStyleStrategy(LLMProviderStrategy):
-    """
-    Handles OpenAI, vLLM, DeepSeek, and other compatible APIs.
-    """
-    def get_headers(self, api_key: str) -> Dict[str, str]:
-        return {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict) -> Dict:
-
-        allowed_keys = {"temperature", "max_tokens", "top_p", "top_k", "stop"}
-        actual_keys = set(settings.keys())
-        assert actual_keys.issubset(allowed_keys), f"Invalid keys found: {actual_keys - allowed_keys}"
-        
-        return {
-            "model": model,
-            "messages": messages,
-            "stream": stream,
-            **settings
-        }
-
-    def parse_response(self, response_data: Dict) -> str:
-        try:
-            return response_data['choices'][0]['message']['content']
-        except (KeyError, IndexError):
-            raise ValueError(f"Unexpected response format: {response_data}")
-
-    def parse_stream_chunk(self, line: str) -> Optional[str]:
-        if not line.startswith("data: "):
-            return None
-        data_str = line[6:]  # Strip 'data: '
-        if data_str.strip() == "[DONE]":
-            return None
-        try:
-            data = json.loads(data_str)
-            delta = data['choices'][0]['delta']
-            return delta.get('content', '')
-        except json.JSONDecodeError:
-            return None
-
-class AnthropicStrategy(LLMProviderStrategy):
-    """Handles Claude / Anthropic specific API formats."""
-    def get_headers(self, api_key: str) -> Dict[str, str]:
-        return {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
-        }
-
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict) -> Dict:
-        # Anthropic requires 'system' to be top-level, separate from 'messages'
-        system_msg = next((msg['content'] for msg in messages if msg['role'] == 'system'), None)
-        chat_messages = [msg for msg in messages if msg['role'] != 'system']
-        
-        payload = {
-            "model": model,
-            "messages": chat_messages,
-            "stream": stream,
-            **settings
-        }
-        if system_msg:
-            payload["system"] = system_msg
-        return payload
-
-    def parse_response(self, response_data: Dict) -> str:
-        return response_data['content'][0]['text']
-
-    def parse_stream_chunk(self, line: str) -> Optional[str]:
-        if not line.startswith("data: "):
-            return None
-        try:
-            data = json.loads(line[6:])
-            if data['type'] == 'content_block_delta':
-                return data['delta'].get('text', '')
-            return None
-        except:
-            return None
-
-class GoogleGeminiStrategy(LLMProviderStrategy):
-    """Handles Google Gemini REST API formats."""
-    def get_headers(self, api_key: str) -> Dict[str, str]:
-        # Google often passes API key via query param, but can use header for some setups.
-        # This implementation assumes standard REST approach; SDK use is usually preferred for Google.
-        return {
-            'X-goog-api-key': api_key,
-            "Content-Type": "application/json"
-        }
-
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict) -> Dict:
-        # Simplistic mapping to Google's "contents" format
-        gemini_contents = []
-        for msg in messages:
-            role = "user" if msg['role'] == "user" else "model"
-            gemini_contents.append({
-                "role": role,
-                "parts": [{"text": msg['content']}]
-            })
-
-        if "max_tokens" in settings:
-            settings["max_output_tokens"] = settings.pop("max_tokens")
-
-        allowed_keys = {"temperature", "max_output_tokens", "top_p", "top_k", "stop_sequences"}
-        actual_keys = set(settings.keys())
-
-        # Checks if actual_keys is a subset of allowed_keys
-        assert actual_keys.issubset(allowed_keys), f"Invalid keys found: {actual_keys - allowed_keys}"
-        
-        return {
-            "contents": gemini_contents,
-            "generation_config": settings
-        }
-
-    def parse_response(self, response_data: Dict) -> str:
-        try:
-            return response_data['candidates'][0]['content']['parts'][0]['text']
-        except KeyError:
-            return ""
-
-    def parse_stream_chunk(self, line: str) -> Optional[str]:
-        if not line.startswith("data: "):
-            return None
-        data_str = line[6:]
-        if not data_str:
-            return None
-        try:
-            data = json.loads(data_str)
-            return data['candidates'][0]['content']['parts'][0]['text']
-        except (json.JSONDecodeError, KeyError, IndexError):
-            return None
-
-
-
 class UniversalLLMClient(LLMInterface):
     def __init__(self, config: LLMConfig, provider: LLMProviderStrategy):
         self.config = config
@@ -274,7 +140,7 @@ class UniversalLLMClient(LLMInterface):
             settings.update(overrides)
         return settings
 
-    def send_message(self, messages: List[Dict[str, str]], endpoint: str = None, **kwargs) -> Dict:
+    def send_message(self, messages: List[Dict[str, str]], endpoint: str = None, tools: Optional[List[Dict]] = None, **kwargs) -> Dict:
         """Synchronous Send"""
         if endpoint is None:
             if isinstance(self.provider, GoogleGeminiStrategy):
@@ -285,11 +151,13 @@ class UniversalLLMClient(LLMInterface):
                 endpoint = "/chat/completions"
 
         full_url = f"{self.config.base_url}{endpoint}"
+
         payload = self.provider.prepare_payload(
             self.config.model, 
             messages, 
             stream=False, 
-            settings=self._merge_settings(kwargs)
+            settings=self._merge_settings(kwargs),
+            tools=tools
         )
 
         # Special handling for Google which uses query params for API key sometimes
@@ -310,9 +178,9 @@ class UniversalLLMClient(LLMInterface):
             # logging.error(f"Request failed: {e}")
             raise
 
-    async def stream_message(self, messages: List[Dict[str, str]], endpoint: str = None, **kwargs) -> AsyncGenerator[str, None]:
+    async def stream_message(self, messages: List[Dict[str, str]], endpoint: str = None, tools: Optional[List[Dict]] = None, **kwargs) -> AsyncGenerator[str, None]:
         """Asynchronous Streaming"""
-        if endpoint is None:
+        if endpoint == None:
             if isinstance(self.provider, GoogleGeminiStrategy):
                 endpoint = f"/models/{self.config.model}:streamGenerateContent?alt=sse"
             elif isinstance(self.provider, AnthropicStrategy):
@@ -321,11 +189,13 @@ class UniversalLLMClient(LLMInterface):
                 endpoint = "/chat/completions"
 
         full_url = f"{self.config.base_url}{endpoint}"
+
         payload = self.provider.prepare_payload(
             self.config.model, 
             messages, 
             stream=True, 
-            settings=self._merge_settings(kwargs)
+            settings=self._merge_settings(kwargs),
+            tools=tools
         )
 
         params = {}

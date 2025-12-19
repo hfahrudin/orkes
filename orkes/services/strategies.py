@@ -10,7 +10,7 @@ class LLMProviderStrategy(ABC):
     """
     
     @abstractmethod
-    def prepare_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, settings: Dict) -> Dict:
+    def prepare_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
         """Convert standard messages to provider-specific JSON payload."""
         pass
 
@@ -41,22 +41,25 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict) -> Dict:
-
-        allowed_keys = {"temperature", "max_tokens", "top_p", "top_k", "stop"}
-        actual_keys = set(settings.keys())
-        assert actual_keys.issubset(allowed_keys), f"Invalid keys found: {actual_keys - allowed_keys}"
-        
-        return {
+    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+        payload = {
             "model": model,
             "messages": messages,
             "stream": stream,
             **settings
         }
+        if tools:
+            payload['tools'] = tools
+        return payload
 
     def parse_response(self, response_data: Dict) -> str:
         try:
-            return response_data['choices'][0]['message']['content']
+            message = response_data['choices'][0]['message']
+            if 'tool_calls' in message and message['tool_calls']:
+                return json.dumps({
+                    "tool_calls": message['tool_calls']
+                })
+            return message['content']
         except (KeyError, IndexError):
             raise ValueError(f"Unexpected response format: {response_data}")
 
@@ -83,7 +86,7 @@ class AnthropicStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict) -> Dict:
+    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
         # Anthropic requires 'system' to be top-level, separate from 'messages'
         system_msg = next((msg['content'] for msg in messages if msg['role'] == 'system'), None)
         chat_messages = [msg for msg in messages if msg['role'] != 'system']
@@ -96,9 +99,28 @@ class AnthropicStrategy(LLMProviderStrategy):
         }
         if system_msg:
             payload["system"] = system_msg
+        
+        if tools:
+            payload["tools"] = tools
+
         return payload
 
     def parse_response(self, response_data: Dict) -> str:
+        
+        # Check for tool use
+        tool_use_block = next((block for block in response_data['content'] if block['type'] == 'tool_use'), None)
+        if tool_use_block:
+            return json.dumps({
+                "tool_calls": [{
+                    "id": tool_use_block['id'],
+                    "type": "function",
+                    "function": {
+                        "name": tool_use_block['name'],
+                        "arguments": json.dumps(tool_use_block['input'])
+                    }
+                }]
+            })
+        
         return response_data['content'][0]['text']
 
     def parse_stream_chunk(self, line: str) -> Optional[str]:
@@ -122,7 +144,7 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict) -> Dict:
+    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
         # Simplistic mapping to Google's "contents" format
         gemini_contents = []
         for msg in messages:
@@ -135,21 +157,44 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
         if "max_tokens" in settings:
             settings["max_output_tokens"] = settings.pop("max_tokens")
 
-        allowed_keys = {"temperature", "max_output_tokens", "top_p", "top_k", "stop_sequences"}
-        actual_keys = set(settings.keys())
-
-        # Checks if actual_keys is a subset of allowed_keys
-        assert actual_keys.issubset(allowed_keys), f"Invalid keys found: {actual_keys - allowed_keys}"
-        
-        return {
+        payload = {
             "contents": gemini_contents,
             "generation_config": settings
         }
 
+        if tools:
+            payload['tools'] = tools
+
+        return payload
+
+
     def parse_response(self, response_data: Dict) -> str:
         try:
-            return response_data['candidates'][0]['content']['parts'][0]['text']
-        except KeyError:
+            candidate = response_data['candidates'][0]
+            if 'content' in candidate and 'parts' in candidate['content']:
+                parts = candidate['content']['parts']
+                # Check for function call
+                function_call_part = next((part for part in parts if 'functionCall' in part), None)
+                if function_call_part:
+                     # Adapt to OpenAI's 'tool_calls' structure
+                    return json.dumps({
+                        "tool_calls": [{
+                            "id": "null",
+                            "type": "function",
+                            "function": {
+                                "name": function_call_part['functionCall']['name'],
+                                "arguments": json.dumps(function_call_part['functionCall']['args'])
+                            }
+                        }]
+                    })
+                
+                # Fallback to text
+                text_part = next((part['text'] for part in parts if 'text' in part), None)
+                if text_part:
+                    return text_part
+
+            return "" # Should not be reached if response is valid
+        except (KeyError, IndexError):
             return ""
 
     def parse_stream_chunk(self, line: str) -> Optional[str]:
