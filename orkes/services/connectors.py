@@ -314,7 +314,7 @@ class UniversalLLMClient(LLMInterface):
         """Asynchronous Streaming"""
         if endpoint is None:
             if isinstance(self.provider, GoogleGeminiStrategy):
-                endpoint = f"/models/{self.config.model}:streamGenerateContent"
+                endpoint = f"/models/{self.config.model}:streamGenerateContent?alt=sse"
             elif isinstance(self.provider, AnthropicStrategy):
                 endpoint = "/messages"
             else:
