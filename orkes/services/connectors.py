@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
 from typing import Optional, Dict, AsyncGenerator, Any, List
 import requests
-from requests import Response
 import json
 import aiohttp
 from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
+from orkes.services.schema import LLMInterface
 
 class LLMConfig:
     """Universal configuration object for any LLM connection."""
@@ -24,53 +23,6 @@ class LLMConfig:
             "temperature": 0.7,
             "max_tokens": 1024
         }
-
-class LLMProviderStrategy(ABC):
-    """
-    Strategy interface for handling provider-specific logic.
-    Responsible for payload structure and parsing responses.
-    """
-    
-    @abstractmethod
-    def prepare_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, tools: Optional[List[Dict]], settings: Dict) -> Dict:
-        """Convert standard messages to provider-specific JSON payload."""
-        pass
-
-    @abstractmethod
-    def parse_response(self, response_data: Dict) -> str:
-        """Extract text content from a non-streaming response."""
-        pass
-
-    @abstractmethod
-    def parse_stream_chunk(self, chunk: str) -> Optional[str]:
-        """Extract text content from a streaming chunk line."""
-        pass
-    
-    @abstractmethod
-    def get_headers(self, api_key: str) -> Dict[str, str]:
-        """Return authentication headers."""
-        pass
-
-class LLMInterface(ABC):
-    """
-    Abstract base class for LLM connections.
-    Defines methods to send, streams.
-    """
-
-    @abstractmethod
-    def send_message(self, message, **kwargs) -> Response:
-        """Send a message and receive the full response."""
-        pass
-    
-    @abstractmethod
-    def stream_message(self, message, **kwargs) -> AsyncGenerator[str, None]:
-        """Stream the response incrementally."""
-        pass
-
-    @abstractmethod
-    def health_check(self) -> Response:
-        """Check the server's health status."""
-        pass
 
 
 class vLLMConnection(LLMInterface):
@@ -172,7 +124,7 @@ class UniversalLLMClient(LLMInterface):
             # Return raw data + parsed content for convenience
             return {
                 "raw": data,
-                "content": self.provider.parse_response(data)
+                "content": self.provider.parse_response(data).model_dump()
             }
         except requests.RequestException as e:
             # logging.error(f"Request failed: {e}")

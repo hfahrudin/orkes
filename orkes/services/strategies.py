@@ -1,36 +1,8 @@
-from abc import ABC, abstractmethod
-from typing import Optional, Dict, AsyncGenerator, Any, List
+from typing import Optional, Dict,List
 import json
+from orkes.services.schema import LLMProviderStrategy, ResponseSchema, ToolCallSchema
 
-
-class LLMProviderStrategy(ABC):
-    """
-    Strategy interface for handling provider-specific logic.
-    Responsible for payload structure and parsing responses.
-    """
-    
-    @abstractmethod
-    def prepare_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
-        """Convert standard messages to provider-specific JSON payload."""
-        pass
-
-    @abstractmethod
-    def parse_response(self, response_data: Dict) -> str:
-        """Extract text content from a non-streaming response."""
-        pass
-
-    @abstractmethod
-    def parse_stream_chunk(self, chunk: str) -> Optional[str]:
-        """Extract text content from a streaming chunk line."""
-        pass
-    
-    @abstractmethod
-    def get_headers(self, api_key: str) -> Dict[str, str]:
-        """Return authentication headers."""
-        pass
-
-
-
+#TODO: STANDARIZED FOR STREAM
 class OpenAIStyleStrategy(LLMProviderStrategy):
     """
     Handles OpenAI, vLLM, DeepSeek, and other compatible APIs.
@@ -52,14 +24,19 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
             payload['tools'] = tools
         return payload
 
-    def parse_response(self, response_data: Dict) -> str:
+    def parse_response(self, response_data: Dict) -> ResponseSchema:
         try:
             message = response_data['choices'][0]['message']
             if 'tool_calls' in message and message['tool_calls']:
-                return json.dumps({
-                    "tool_calls": message['tool_calls']
-                })
-            return message['content']
+                tools_called = []
+                for tool_call in message['tool_calls']:
+
+                    tool_schema =  ToolCallSchema(function_name=tool_call['function']['name'],
+                                                 arguments=json.loads(tool_call['function']['arguments']))
+                    tools_called.append(tool_schema)
+                return ResponseSchema(content_type="tool_calls", content=tools_called)
+            return ResponseSchema(content_type="message", content=message['content'])
+        
         except (KeyError, IndexError):
             raise ValueError(f"Unexpected response format: {response_data}")
 
@@ -107,21 +84,36 @@ class AnthropicStrategy(LLMProviderStrategy):
 
     def parse_response(self, response_data: Dict) -> str:
         
-        # Check for tool use
-        tool_use_block = next((block for block in response_data['content'] if block['type'] == 'tool_use'), None)
-        if tool_use_block:
-            return json.dumps({
-                "tool_calls": [{
-                    "id": tool_use_block['id'],
-                    "type": "function",
-                    "function": {
-                        "name": tool_use_block['name'],
-                        "arguments": json.dumps(tool_use_block['input'])
-                    }
-                }]
-            })
-        
-        return response_data['content'][0]['text']
+        try:
+            # Anthropic path: content is a list of blocks
+            content_blocks = response_data.get('content', [])
+            
+            tools_called = []
+            text_parts = []
+
+            for block in content_blocks:
+                # 1. Check for Tool Use (Anthropic uses 'tool_use' type)
+                if block.get('type') == 'tool_use':
+                    tool_schema = ToolCallSchema(
+                        name=block['name'],
+                        arguments=block.get('input', {}), # Already a dict
+                        id=block['id']                    # Anthropic ALWAYS provides a tool_use ID
+                    )
+                    tools_called.append(tool_schema)
+                
+                # 2. Check for Text blocks
+                elif block.get('type') == 'text':
+                    text_parts.append(block['text'])
+
+            if tools_called:
+                return ResponseSchema(content_type="tool_calls", content=tools_called)
+            
+            # Join all text blocks if there were multiple
+            full_text = "\n".join(text_parts)
+            return ResponseSchema(content_type="message", content=full_text)
+
+        except (KeyError, IndexError):
+            raise ValueError(f"Unexpected Anthropic response format: {response_data}")
 
     def parse_stream_chunk(self, line: str) -> Optional[str]:
         if not line.startswith("data: "):
@@ -170,32 +162,34 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
 
     def parse_response(self, response_data: Dict) -> str:
         try:
+            # Gemini path: candidates[0] -> content -> parts
             candidate = response_data['candidates'][0]
-            if 'content' in candidate and 'parts' in candidate['content']:
-                parts = candidate['content']['parts']
-                # Check for function call
-                function_call_part = next((part for part in parts if 'functionCall' in part), None)
-                if function_call_part:
-                     # Adapt to OpenAI's 'tool_calls' structure
-                    return json.dumps({
-                        "tool_calls": [{
-                            "id": "null",
-                            "type": "function",
-                            "function": {
-                                "name": function_call_part['functionCall']['name'],
-                                "arguments": json.dumps(function_call_part['functionCall']['args'])
-                            }
-                        }]
-                    })
-                
-                # Fallback to text
-                text_part = next((part['text'] for part in parts if 'text' in part), None)
-                if text_part:
-                    return text_part
+            parts = candidate.get('content', {}).get('parts', [])
+            
+            tools_called = []
+            text_content = ""
 
-            return "" # Should not be reached if response is valid
+            for part in parts:
+                # 1. Check for Function Calls (Gemini uses 'functionCall' and 'args')
+                if 'functionCall' in part:
+                    fc = part['functionCall']
+                    tool_schema = ToolCallSchema(
+                        function_name=fc['name'],
+                        arguments=fc.get('args', {}) # Already a dict, no json.loads needed
+                    )
+                    tools_called.append(tool_schema)
+                
+                # 2. Check for Text (In case of mixed response or plain message)
+                elif 'text' in part:
+                    text_content += part['text']
+
+            if tools_called:
+                return ResponseSchema(content_type="tool_calls", content=tools_called)
+            
+            return ResponseSchema(content_type="message", content=text_content)
+
         except (KeyError, IndexError):
-            return ""
+            raise ValueError(f"Unexpected Gemini response format: {response_data}")
 
     def parse_stream_chunk(self, line: str) -> Optional[str]:
         if not line.startswith("data: "):

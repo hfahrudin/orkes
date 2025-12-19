@@ -126,14 +126,17 @@ async def test_openai_with_tool_calling_live():
 
     response = openai_client.send_message(messages, tools=tools)
     
-    tool_calls = json.loads(response['content'])
-    assert tool_calls.get("tool_calls") is not None
-    tool_call = tool_calls["tool_calls"][0]
-    tool_arg = tool_call["function"]["arguments"]
-    print("Expected tool call: get_weather | Expected argument: San Francisco")
-    print(f"Returned tool call: {tool_call} | Expected argument:{tool_arg}")
-    assert tool_call["function"]["name"] == "get_weather"
-    assert "San Francisco" in tool_call["function"]["arguments"]
+    result = response['content']
+    content_type = result.get("content_type")
+    content = result.get("content")
+    assert content_type == "tool_calls", f"Expected content_type 'tool_calls', got '{content_type}'"
+    tool_call = content[0]
+    tool_name = tool_call["function_name"]
+    tool_arguments = tool_call["arguments"]
+    print("Expected tool call: get_weather | Expected argument: location-San Francisco")
+    print(f"Returned tool call: {tool_name} | Expected argument:{tool_arguments}")
+    assert tool_name == "get_weather"
+    assert "San Francisco" in str(tool_arguments)
 
 
 @pytest.mark.asyncio
@@ -171,11 +174,14 @@ async def test_gemini_with_tool_calling_live():
     
     response = gemini_client.send_message(messages, tools=tools)
     
-    tool_calls = json.loads(response['content'])
-    assert tool_calls.get("tool_calls") is not None
-    tool_call = tool_calls["tool_calls"][0]
-    tool_arg = tool_call["function"]["arguments"]
-    print("Expected tool call: get_weather | Expected argument: San Francisco")
-    print(f"Returned tool call: {tool_call} | Expected argument:{tool_arg}")
-    assert tool_call["function"]["name"] == "get_weather"
-    assert "San Francisco" in tool_call["function"]["arguments"]
+    result = response['content']
+    content_type = result.get("content_type")
+    content = result.get("content")
+    assert content_type == "tool_calls", f"Expected content_type 'tool_calls', got '{content_type}'"
+    tool_call = content[0]
+    tool_name = tool_call["function_name"]
+    tool_arguments = tool_call["arguments"]
+    print("Expected tool call: get_weather | Expected argument: location-San Francisco")
+    print(f"Returned tool call: {tool_name} | Expected argument:{tool_arguments}")
+    assert tool_name == "get_weather"
+    assert "San Francisco" in str(tool_arguments)

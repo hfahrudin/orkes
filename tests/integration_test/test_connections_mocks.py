@@ -33,7 +33,11 @@ async def test_openai_style_connection(mock_server):
 
     # Test send
     response = vllm_client.send_message(messages)
-    assert "Hello from OpenAI/vLLM" in response['content']
+    result = response['content']
+    content_type = result.get("content_type")
+    content = result.get("content")
+    assert content_type == "message"
+    assert "Hello from OpenAI/vLLM" in content
 
     # Test stream
     stream_response = vllm_client.stream_message(messages)
@@ -54,7 +58,11 @@ async def test_gemini_connection(mock_server):
 
     # Test send
     response = gemini_client.send_message(messages)
-    assert "Hello from Gemini" in response['content']
+    result = response['content']
+    content_type = result.get("content_type")
+    content = result.get("content")
+    assert content_type == "message"
+    assert "Hello from Gemini" in content
   
     # Test stream
     stream_response = gemini_client.stream_message(messages)
@@ -75,7 +83,11 @@ async def test_anthropic_connection(mock_server):
 
     # Test send
     response = anthropic_client.send_message(messages)
-    assert "Hello from Claude" in response['content']
+    result = response['content']
+    content_type = result.get("content_type")
+    content = result.get("content")
+    assert content_type == "message"
+    assert "Hello from Claude" in content
 
     # Test stream
     stream_response = anthropic_client.stream_message(messages)
@@ -115,12 +127,16 @@ async def test_openai_style_tool_calling_mock(mock_server):
 
     response = vllm_client.send_message(messages, tools=tools)
     
-    tool_calls = json.loads(response['content'])
-    assert tool_calls.get("tool_calls") is not None
-    tool_call = tool_calls["tool_calls"][0]
-    assert tool_call["function"]["name"] == "get_weather"
-    assert "San Francisco" in tool_call["function"]["arguments"]
+    result = response['content']
+    content_type = result.get("content_type")
+    content = result.get("content")
+    assert content_type == "tool_calls", f"Expected content_type 'tool_calls', got '{content_type}'"
+    tool_call = content[0]
+    tool_name = tool_call["function_name"]
+    tool_arguments = tool_call["arguments"]
 
+    assert tool_name == "get_weather"
+    assert "San Francisco" in str(tool_arguments)
 
 @pytest.mark.asyncio
 async def test_gemini_tool_calling_mock(mock_server):
@@ -153,8 +169,13 @@ async def test_gemini_tool_calling_mock(mock_server):
 
     response = gemini_client.send_message(messages, tools=tools)
     
-    tool_calls = json.loads(response['content'])
-    assert tool_calls.get("tool_calls") is not None
-    tool_call = tool_calls["tool_calls"][0]
-    assert tool_call["function"]["name"] == "get_weather"
-    assert "San Francisco" in tool_call["function"]["arguments"]
+    result = response['content']
+    content_type = result.get("content_type")
+    content = result.get("content")
+    assert content_type == "tool_calls", f"Expected content_type 'tool_calls', got '{content_type}'"
+    tool_call = content[0]
+    tool_name = tool_call["function_name"]
+    tool_arguments = tool_call["arguments"]
+
+    assert tool_name == "get_weather"
+    assert "San Francisco" in str(tool_arguments)
