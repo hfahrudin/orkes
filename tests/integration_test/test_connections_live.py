@@ -1,5 +1,6 @@
 import os
 import pytest
+import json
 from orkes.services.connectors import LLMFactory
 
 from dotenv import load_dotenv
@@ -87,3 +88,94 @@ async def test_gemini_api_stream_send_with_env_key():
 
     except Exception as e:
         pytest.fail(f"Real Gemini API test failed: {e}")
+
+
+@pytest.mark.asyncio
+async def test_openai_with_tool_calling_live():
+    """
+    Test actual OpenAI API with tool calling functionality.
+    This test will be skipped if OPENAI_API_KEY is not found.
+    """
+    load_dotenv()
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        pytest.skip("OPENAI_API_KEY not found. Skipping real OpenAI API test.")
+
+    openai_client = LLMFactory.create_openai(api_key=openai_api_key)
+    
+    messages = [{"role": "user", "content": "What is the weather in San Francisco?"}]
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather in a given location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+
+    response = openai_client.send_message(messages, tools=tools)
+    
+    tool_calls = json.loads(response['content'])
+    assert tool_calls.get("tool_calls") is not None
+    tool_call = tool_calls["tool_calls"][0]
+    tool_arg = tool_call["function"]["arguments"]
+    print("Expected tool call: get_weather | Expected argument: San Francisco")
+    print(f"Returned tool call: {tool_call} | Expected argument:{tool_arg}")
+    assert tool_call["function"]["name"] == "get_weather"
+    assert "San Francisco" in tool_call["function"]["arguments"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_with_tool_calling_live():
+    """
+    Test actual Gemini API with tool calling functionality.
+    This test will be skipped if GEMINI_API_KEY is not found.
+    """
+    load_dotenv()
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    if not gemini_api_key:
+        pytest.skip("GEMINI_API_KEY not found. Skipping real Gemini API test.")
+
+    gemini_client = LLMFactory.create_gemini(api_key=gemini_api_key)
+    
+    messages = [{"role": "user", "content": "What is the weather in San Francisco?"}]
+    tools = [{
+        "function_declarations": [
+            {
+                "name": "get_weather",
+                "description": "Get the current weather in a given location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                    },
+                    "required": ["location"],
+                },
+            }
+        ]
+    }]
+    
+    response = gemini_client.send_message(messages, tools=tools)
+    
+    tool_calls = json.loads(response['content'])
+    assert tool_calls.get("tool_calls") is not None
+    tool_call = tool_calls["tool_calls"][0]
+    tool_arg = tool_call["function"]["arguments"]
+    print("Expected tool call: get_weather | Expected argument: San Francisco")
+    print(f"Returned tool call: {tool_call} | Expected argument:{tool_arg}")
+    assert tool_call["function"]["name"] == "get_weather"
+    assert "San Francisco" in tool_call["function"]["arguments"]

@@ -2,6 +2,7 @@ import subprocess
 import time
 import os
 import pytest
+import json
 from orkes.services.connectors import LLMFactory
 
 from dotenv import load_dotenv
@@ -82,3 +83,78 @@ async def test_anthropic_connection(mock_server):
     async for chunk in stream_response:
         full_content += chunk
     assert "Hello from Claude" in full_content
+
+
+@pytest.mark.asyncio
+async def test_openai_style_tool_calling_mock(mock_server):
+    vllm_client = LLMFactory.create_vllm(
+        url=f"{mock_server}/v1", 
+        model="meta-llama/Llama-2-7b-chat-hf"
+    )
+    
+    messages = [{"role": "user", "content": "What is the weather in San Francisco?"}]
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather in a given location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+
+    response = vllm_client.send_message(messages, tools=tools)
+    
+    tool_calls = json.loads(response['content'])
+    assert tool_calls.get("tool_calls") is not None
+    tool_call = tool_calls["tool_calls"][0]
+    assert tool_call["function"]["name"] == "get_weather"
+    assert "San Francisco" in tool_call["function"]["arguments"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_tool_calling_mock(mock_server):
+    gemini_client = LLMFactory.create_gemini(
+        api_key="test-key",
+        model="gemini-pro",
+        base_url=f"{mock_server}/v1beta"
+    )
+    
+    messages = [{"role": "user", "content": "What is the weather in San Francisco?"}]
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather in a given location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+
+    response = gemini_client.send_message(messages, tools=tools)
+    
+    tool_calls = json.loads(response['content'])
+    assert tool_calls.get("tool_calls") is not None
+    tool_call = tool_calls["tool_calls"][0]
+    assert tool_call["function"]["name"] == "get_weather"
+    assert "San Francisco" in tool_call["function"]["arguments"]

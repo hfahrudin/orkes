@@ -18,6 +18,7 @@ class ChatCompletionRequest(BaseModel):
     stop: list = None
     temperature: float = 0.7
     stream: bool = False
+    tools: Optional[list] = None
 
 class CompletionRequest(BaseModel):
     model: str
@@ -30,6 +31,7 @@ class CompletionRequest(BaseModel):
 class GeminiRequest(BaseModel):
     contents: list
     stream: bool = False
+    tools: Optional[list] = None
 
 class ClaudeRequest(BaseModel):
     model: str
@@ -65,6 +67,31 @@ async def openai_stream_generator():
 async def create_chat_completion(request: ChatCompletionRequest):
     if request.stream:
         return StreamingResponse(openai_stream_generator(), media_type="application/x-ndjson")
+    
+    if request.tools:
+        return {
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": request.model,
+            "choices": [{
+                "index": 0, 
+                "message": {
+                    "role": "assistant", 
+                    "content": None,
+                    "tool_calls": [{
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\n  \"location\": \"San Francisco\"\n}"
+                        }
+                    }]
+                }, 
+                "finish_reason": "tool_calls"
+            }],
+            "usage": {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21},
+        }
     else:
         return {
             "id": "chatcmpl-123",
@@ -94,6 +121,26 @@ async def gemini_stream_generator():
 
 @app.post("/v1beta/models/{model}:generateContent")
 async def generate_gemini_content(model: str, request: GeminiRequest):
+    if request.tools:
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "functionCall": {
+                                    "name": "get_weather",
+                                    "args": {
+                                        "location": "San Francisco"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "finishReason": "TOOL_CODE",
+                }
+            ]
+        }
     return {
         "candidates": [
             {
