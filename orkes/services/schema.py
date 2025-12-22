@@ -5,11 +5,11 @@ from pydantic import BaseModel
 from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
 
 class ToolCallSchema(BaseModel):
-    """Schema for tool call information in LLM responses."""
+    """Schema for tool call information in LLM request."""
     function_name: str
     arguments: Dict[str, Any]
 
-class ResponseSchema(BaseModel):
+class RequestSchema(BaseModel):
     """Schema for a standard LLM response."""
     content_type: str
     content : Union[str, List[ToolCallSchema]]
@@ -26,8 +26,8 @@ class LLMProviderStrategy(ABC):
         pass
 
     @abstractmethod
-    def parse_response(self, response_data: Dict) -> ResponseSchema:
-        """Extract text content from a non-streaming response."""
+    def parse_response(self, response_data: Dict) -> RequestSchema:
+        """Extract text content from a llm reqeust."""
         pass
 
     @abstractmethod
@@ -42,12 +42,12 @@ class LLMProviderStrategy(ABC):
 
     @abstractmethod
     def get_messages_payload(self, messages: OrkesMessagesSchema):
-        """Return authentication headers."""
+        """Convert Orkes message schema to suitable format for specific LLM inference payload."""
         pass
 
     @abstractmethod
     def get_tools_payload(self, messages: OrkesToolSchema):
-        """Return authentication headers."""
+        """Convert Orkes tools schema to suitable format for specific LLM inference payload."""
         pass
 
 

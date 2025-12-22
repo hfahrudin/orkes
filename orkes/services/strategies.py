@@ -1,6 +1,6 @@
 from typing import Optional, Dict,List
 import json
-from orkes.services.schema import LLMProviderStrategy, ResponseSchema, ToolCallSchema
+from orkes.services.schema import LLMProviderStrategy, RequestSchema, ToolCallSchema
 from typing import Optional, Dict,List, Union
 from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
 
@@ -38,7 +38,7 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
             payload['tools'] = self.get_tools_payload(tools)
         return payload
 
-    def parse_response(self, response_data: Dict) -> ResponseSchema:
+    def parse_response(self, response_data: Dict) -> RequestSchema:
         try:
             message = response_data['choices'][0]['message']
             if 'tool_calls' in message and message['tool_calls']:
@@ -48,8 +48,8 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
                     tool_schema =  ToolCallSchema(function_name=tool_call['function']['name'],
                                                  arguments=json.loads(tool_call['function']['arguments']))
                     tools_called.append(tool_schema)
-                return ResponseSchema(content_type="tool_calls", content=tools_called)
-            return ResponseSchema(content_type="message", content=message['content'])
+                return RequestSchema(content_type="tool_calls", content=tools_called)
+            return RequestSchema(content_type="message", content=message['content'])
         
         except (KeyError, IndexError):
             raise ValueError(f"Unexpected response format: {response_data}")
@@ -138,11 +138,11 @@ class AnthropicStrategy(LLMProviderStrategy):
                     text_parts.append(block['text'])
 
             if tools_called:
-                return ResponseSchema(content_type="tool_calls", content=tools_called)
+                return RequestSchema(content_type="tool_calls", content=tools_called)
             
             # Join all text blocks if there were multiple
             full_text = "\n".join(text_parts)
-            return ResponseSchema(content_type="message", content=full_text)
+            return RequestSchema(content_type="message", content=full_text)
 
         except (KeyError, IndexError):
             raise ValueError(f"Unexpected Anthropic response format: {response_data}")
@@ -233,9 +233,9 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
                     text_content += part['text']
 
             if tools_called:
-                return ResponseSchema(content_type="tool_calls", content=tools_called)
+                return RequestSchema(content_type="tool_calls", content=tools_called)
             
-            return ResponseSchema(content_type="message", content=text_content)
+            return RequestSchema(content_type="message", content=text_content)
 
         except (KeyError, IndexError):
             raise ValueError(f"Unexpected Gemini response format: {response_data}")
