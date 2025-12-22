@@ -2,19 +2,13 @@ from orkes.services.connectors import LLMInterface
 from orkes.services.prompts import PromptInterface
 from orkes.agents.actions import ActionBuilder
 from orkes.services.prompts import ChatPromptHandler
-from abc import ABC, abstractmethod
+
 from orkes.services.responses import ResponseInterface
 from typing import Dict, List
 import json
 from requests import Response
 import re
-
-class AgentInterface(ABC):
-
-    @abstractmethod
-    def invoke(self, queries, chat_history):
-        """Invoke the agent with a message."""
-        pass
+from orkes.agents.schema import AgentInterface
 
 
 class Agent(AgentInterface):
