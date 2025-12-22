@@ -19,12 +19,11 @@ class LLMProviderStrategy(ABC):
     Strategy interface for handling provider-specific logic.
     Responsible for payload structure and parsing responses.
     """
-    
+
     @abstractmethod
-    def prepare_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+    def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
         """Convert standard messages to provider-specific JSON payload."""
         pass
-
 
     @abstractmethod
     def parse_response(self, response_data: Dict) -> ResponseSchema:
@@ -41,16 +40,10 @@ class LLMProviderStrategy(ABC):
         """Return authentication headers."""
         pass
 
-    # @abstractmethod
-    # def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
-    #     """Return authentication headers."""
-    #     pass
-
-    # @abstractmethod
-    # def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
-    #     """Convert standard messages to provider-specific JSON payload."""
-    #     pass
-
+    @abstractmethod
+    def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
+        """Return authentication headers."""
+        pass
 
 
 class LLMInterface(ABC):

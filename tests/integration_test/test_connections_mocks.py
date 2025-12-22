@@ -4,6 +4,7 @@ import os
 import pytest
 import json
 from orkes.services.connectors import LLMFactory
+from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema
 
 from dotenv import load_dotenv
 
@@ -29,7 +30,7 @@ async def test_openai_style_connection(mock_server):
         model="meta-llama/Llama-2-7b-chat-hf"
     )
     
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = OrkesMessagesSchema(messages=[OrkesMessageSchema(role="user", content="Hello!")])
 
     # Test send
     response = vllm_client.send_message(messages)
@@ -54,7 +55,7 @@ async def test_gemini_connection(mock_server):
         base_url=f"{mock_server}/v1beta"
     )
     
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "Say 'hello' in 5 words."}])
 
     # Test send
     response = gemini_client.send_message(messages)
@@ -79,7 +80,7 @@ async def test_anthropic_connection(mock_server):
         base_url=f"{mock_server}/v1"
     )
     
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "Say 'hello' in 5 words."}])
 
     # Test send
     response = anthropic_client.send_message(messages)
@@ -104,7 +105,7 @@ async def test_openai_style_tool_calling_mock(mock_server):
         model="meta-llama/Llama-2-7b-chat-hf"
     )
     
-    messages = [{"role": "user", "content": "What is the weather in San Francisco?"}]
+    messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "What is the weather in San Francisco?"}])
     tools = [
         {
             "type": "function",
@@ -146,7 +147,7 @@ async def test_gemini_tool_calling_mock(mock_server):
         base_url=f"{mock_server}/v1beta"
     )
     
-    messages = [{"role": "user", "content": "What is the weather in San Francisco?"}]
+    messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "What is the weather in San Francisco?"}])
     tools = [
         {
             "type": "function",

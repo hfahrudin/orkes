@@ -2,6 +2,7 @@ import os
 import pytest
 import json
 from orkes.services.connectors import LLMFactory
+from orkes.shared.schema import OrkesMessagesSchema
 
 from dotenv import load_dotenv
 
@@ -25,7 +26,7 @@ async def test_openai_api_stream_send_with_env_key():
 
         openai_client = LLMFactory.create_openai(api_key=openai_api_key)
         
-        messages = [{"role": "user", "content": "Say 'hello' in 5 words."}]
+        messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "Say 'hello' in 5 words."}])
 
         # Test send functionality
         send_response = openai_client.send_message(messages)
@@ -68,7 +69,7 @@ async def test_gemini_api_stream_send_with_env_key():
 
         gemini_client = LLMFactory.create_gemini(api_key=gemini_api_key)
         
-        messages = [{"role": "user", "content": "Say 'hello' in 5 words."}]
+        messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "Say 'hello' in 5 words."}])
 
         # Test send functionality
         send_response = gemini_client.send_message(messages)
@@ -103,7 +104,7 @@ async def test_openai_with_tool_calling_live():
 
     openai_client = LLMFactory.create_openai(api_key=openai_api_key)
     
-    messages = [{"role": "user", "content": "What is the weather in San Francisco?"}]
+    messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "What is the weather in San Francisco?"}])
     tools = [
         {
             "type": "function",
@@ -129,6 +130,7 @@ async def test_openai_with_tool_calling_live():
     result = response['content']
     content_type = result.get("content_type")
     content = result.get("content")
+    print(content)
     assert content_type == "tool_calls", f"Expected content_type 'tool_calls', got '{content_type}'"
     tool_call = content[0]
     tool_name = tool_call["function_name"]
@@ -152,7 +154,7 @@ async def test_gemini_with_tool_calling_live():
 
     gemini_client = LLMFactory.create_gemini(api_key=gemini_api_key)
     
-    messages = [{"role": "user", "content": "What is the weather in San Francisco?"}]
+    messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "What is the weather in San Francisco?"}])
     tools = [{
         "function_declarations": [
             {

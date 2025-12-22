@@ -1,6 +1,12 @@
 from pydantic import BaseModel
 from typing import List
 
+class OrkesToolSchema(BaseModel):
+    """Schema for a tool definition in Orkes."""
+    name: str
+    description: str
+    parameters: dict
+
 class OrkesMessageSchema(BaseModel):
     """Schema for a single message in an Orkes LLM conversation."""
     role: str

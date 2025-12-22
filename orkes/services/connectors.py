@@ -4,6 +4,7 @@ import json
 import aiohttp
 from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
 from orkes.services.schema import LLMInterface
+from orkes.shared.schema import OrkesMessagesSchema
 
 class LLMConfig:
     """Universal configuration object for any LLM connection."""
@@ -92,7 +93,7 @@ class UniversalLLMClient(LLMInterface):
             settings.update(overrides)
         return settings
 
-    def send_message(self, messages: List[Dict[str, str]], endpoint: str = None, tools: Optional[List[Dict]] = None, **kwargs) -> Dict:
+    def send_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, **kwargs) -> Dict:
         """Synchronous Send"""
         if endpoint is None:
             if isinstance(self.provider, GoogleGeminiStrategy):
@@ -130,7 +131,7 @@ class UniversalLLMClient(LLMInterface):
             # logging.error(f"Request failed: {e}")
             raise
 
-    async def stream_message(self, messages: List[Dict[str, str]], endpoint: str = None, tools: Optional[List[Dict]] = None, **kwargs) -> AsyncGenerator[str, None]:
+    async def stream_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, **kwargs) -> AsyncGenerator[str, None]:
         """Asynchronous Streaming"""
         if endpoint == None:
             if isinstance(self.provider, GoogleGeminiStrategy):

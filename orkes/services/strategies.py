@@ -1,6 +1,8 @@
 from typing import Optional, Dict,List
 import json
 from orkes.services.schema import LLMProviderStrategy, ResponseSchema, ToolCallSchema
+from typing import Optional, Dict,List, Union
+from orkes.shared.schema import OrkesMessagesSchema
 
 #TODO: STANDARIZED FOR STREAM
 class OpenAIStyleStrategy(LLMProviderStrategy):
@@ -13,12 +15,17 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+    def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
+        processed_messages = [msg.model_dump() for msg in messages.messages]
+        return {"messages": processed_messages}
+
+    def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+        message_payload = self.get_messages_payload(messages)
         payload = {
             "model": model,
-            "messages": messages,
             "stream": stream,
-            **settings
+            **settings,
+            **message_payload
         }
         if tools:
             payload['tools'] = tools
@@ -63,19 +70,28 @@ class AnthropicStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+    def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
+        processed_messages = [msg.model_dump() for msg in messages.messages]
+
         # Anthropic requires 'system' to be top-level, separate from 'messages'
-        system_msg = next((msg['content'] for msg in messages if msg['role'] == 'system'), None)
-        chat_messages = [msg for msg in messages if msg['role'] != 'system']
+        system_msg = next((msg['content'] for msg in processed_messages if msg['role'] == 'system'), None)
+        chat_messages = [msg for msg in processed_messages if msg['role'] != 'system']
+
+        message_payload = {"messages": chat_messages}
+        if system_msg:
+            message_payload["system"] = system_msg
+        
+        return message_payload
+
+    def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+        message_payload = self.get_messages_payload(messages)
         
         payload = {
             "model": model,
-            "messages": chat_messages,
             "stream": stream,
-            **settings
+            **settings,
+            **message_payload
         }
-        if system_msg:
-            payload["system"] = system_msg
         
         if tools:
             payload["tools"] = tools
@@ -136,28 +152,36 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def prepare_payload(self, model: str, messages: List, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+    def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
+        processed_messages = [msg.model_dump() for msg in messages.messages]
+
         # Simplistic mapping to Google's "contents" format
         gemini_contents = []
-        for msg in messages:
+        for msg in processed_messages:
             role = "user" if msg['role'] == "user" else "model"
             gemini_contents.append({
                 "role": role,
                 "parts": [{"text": msg['content']}]
             })
+        return {"contents": gemini_contents}
+
+    def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+        message_payload = self.get_messages_payload(messages)
 
         if "max_tokens" in settings:
             settings["max_output_tokens"] = settings.pop("max_tokens")
 
         payload = {
-            "contents": gemini_contents,
-            "generation_config": settings
+            "generation_config": settings,
+            **message_payload
         }
 
         if tools:
             payload['tools'] = tools
 
         return payload
+
+
 
 
     def parse_response(self, response_data: Dict) -> str:
