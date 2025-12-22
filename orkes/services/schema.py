@@ -2,7 +2,7 @@ from typing import Optional, Dict, AsyncGenerator, Any, List, Union
 from abc import ABC, abstractmethod
 from requests import Response
 from pydantic import BaseModel
-from orkes.shared.schema import OrkesMessagesSchema
+from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
 
 class ToolCallSchema(BaseModel):
     """Schema for tool call information in LLM responses."""
@@ -21,7 +21,7 @@ class LLMProviderStrategy(ABC):
     """
 
     @abstractmethod
-    def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+    def prepare_payload(self, model: str, messages:OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
         """Convert standard messages to provider-specific JSON payload."""
         pass
 
@@ -41,7 +41,12 @@ class LLMProviderStrategy(ABC):
         pass
 
     @abstractmethod
-    def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
+    def get_messages_payload(self, messages: OrkesMessagesSchema):
+        """Return authentication headers."""
+        pass
+
+    @abstractmethod
+    def get_tools_payload(self, messages: OrkesToolSchema):
         """Return authentication headers."""
         pass
 

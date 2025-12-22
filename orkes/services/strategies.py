@@ -2,7 +2,7 @@ from typing import Optional, Dict,List
 import json
 from orkes.services.schema import LLMProviderStrategy, ResponseSchema, ToolCallSchema
 from typing import Optional, Dict,List, Union
-from orkes.shared.schema import OrkesMessagesSchema
+from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
 
 #TODO: STANDARIZED FOR STREAM
 class OpenAIStyleStrategy(LLMProviderStrategy):
@@ -15,11 +15,18 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
+    def get_messages_payload(self, messages: OrkesMessagesSchema):
         processed_messages = [msg.model_dump() for msg in messages.messages]
         return {"messages": processed_messages}
+    
+    def get_tools_payload(self, tools: List[OrkesToolSchema]):
+        tool_payloads = [{
+                "type": "function",
+                "function": tool.model_dump()
+            } for tool in tools]
+        return  tool_payloads
 
-    def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+    def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[OrkesToolSchema]] = None) -> Dict:
         message_payload = self.get_messages_payload(messages)
         payload = {
             "model": model,
@@ -28,7 +35,7 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
             **message_payload
         }
         if tools:
-            payload['tools'] = tools
+            payload['tools'] = self.get_tools_payload(tools)
         return payload
 
     def parse_response(self, response_data: Dict) -> ResponseSchema:
@@ -70,7 +77,7 @@ class AnthropicStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
+    def get_messages_payload(self, messages: OrkesMessagesSchema):
         processed_messages = [msg.model_dump() for msg in messages.messages]
 
         # Anthropic requires 'system' to be top-level, separate from 'messages'
@@ -82,8 +89,17 @@ class AnthropicStrategy(LLMProviderStrategy):
             message_payload["system"] = system_msg
         
         return message_payload
+    
+    def get_tools_payload(self, tools: List[OrkesToolSchema]):
+        tool_payloads = [{
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.parameters.model_dump()
+            }
+            for tool in tools]
+        return  tool_payloads
 
-    def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+    def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[OrkesToolSchema]] = None) -> Dict:
         message_payload = self.get_messages_payload(messages)
         
         payload = {
@@ -152,7 +168,7 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
             "Content-Type": "application/json"
         }
 
-    def get_messages_payload(self, messages: Union[str, OrkesMessagesSchema]):
+    def get_messages_payload(self, messages: OrkesMessagesSchema):
         processed_messages = [msg.model_dump() for msg in messages.messages]
 
         # Simplistic mapping to Google's "contents" format
@@ -165,7 +181,19 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
             })
         return {"contents": gemini_contents}
 
-    def prepare_payload(self, model: str, messages: Union[str, OrkesMessagesSchema], stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
+    def get_tools_payload(self, tools: List[OrkesToolSchema]):
+        tools_payloads = []
+        for tool in tools:
+            dump = tool.model_dump()
+            tool_dict =  {
+                "name": dump["name"],
+                "description": dump["description"],
+                "parameters": dump["parameters"]
+            }
+            tools_payloads.append(tool_dict)    
+        return  tools_payloads
+
+    def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[OrkesToolSchema]] = None) -> Dict:
         message_payload = self.get_messages_payload(messages)
 
         if "max_tokens" in settings:
@@ -177,12 +205,9 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
         }
 
         if tools:
-            payload['tools'] = tools
+            payload['tools'] = self.get_tools_payload(tools)
 
         return payload
-
-
-
 
     def parse_response(self, response_data: Dict) -> str:
         try:

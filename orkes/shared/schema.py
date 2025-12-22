@@ -1,11 +1,17 @@
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
-from typing import List
+
+class ToolParameter(BaseModel):
+    """Represents the JSON Schema for tool parameters."""
+    type: str = "object"
+    properties: Dict[str, Any]
+    required: Optional[List[str]] = None
 
 class OrkesToolSchema(BaseModel):
-    """Schema for a tool definition in Orkes."""
+    """A universal tool definition schema."""
     name: str
     description: str
-    parameters: dict
+    parameters: ToolParameter
 
 class OrkesMessageSchema(BaseModel):
     """Schema for a single message in an Orkes LLM conversation."""
