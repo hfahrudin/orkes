@@ -16,6 +16,7 @@ class Node:
         self.name: str = name
         self.func: Callable = func
         self.graph_state = graph_state
+        self.id = "node_"+str(uuid.uuid4())
 
     def execute(self, input_state) -> Any:
         output = self.func(input_state)
@@ -47,7 +48,7 @@ class _EndNode(Node):
 
 class Edge(ABC):
     def __init__(self, from_node: NodePoolItem, to_node: NodePoolItem = None, max_passes=25):
-        self.id = str(uuid.uuid4())
+        self.id = "edge_"+str(uuid.uuid4())
         self.from_node = from_node
         self.to_node = to_node
         self.passes = 0

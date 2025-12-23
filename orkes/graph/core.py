@@ -3,11 +3,14 @@ from orkes.graph.utils import function_assertion, is_typeddict_class
 from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode
 from orkes.graph.schema import NodePoolItem
 from orkes.graph.runner import GraphRunner
-
+import uuid
 
 class OrkesGraph:
-    def __init__(self, state):
+    def __init__(self, state, name:str = "default_graph", description:str = None):
         self.state = state
+        self.name = name
+        self.description = description
+        self.id = "graph_"+str(uuid.uuid4())
         self.START = _StartNode(self.state)
         self.END = _EndNode(self.state)
         self._nodes_pool: Dict[str, NodePoolItem] = {
