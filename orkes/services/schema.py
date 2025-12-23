@@ -46,7 +46,7 @@ class LLMProviderStrategy(ABC):
         pass
 
     @abstractmethod
-    def get_tools_payload(self, messages: OrkesToolSchema):
+    def get_tools_payload(self, messages: List[OrkesToolSchema]):
         """Convert Orkes tools schema to suitable format for specific LLM inference payload."""
         pass
 

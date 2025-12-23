@@ -2,7 +2,8 @@ import os
 import pytest
 import json
 from orkes.services.connectors import LLMFactory
-from orkes.shared.schema import OrkesMessagesSchema
+from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
+from jsonschema import validate
 
 from dotenv import load_dotenv
 
@@ -105,27 +106,42 @@ async def test_openai_with_tool_calling_live():
     openai_client = LLMFactory.create_openai(api_key=openai_api_key)
     
     messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "What is the weather in San Francisco?"}])
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-                "description": "Get the current weather in a given location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {
-                            "type": "string",
-                            "description": "The city and state, e.g. San Francisco, CA",
-                        },
-                    },
-                    "required": ["location"],
-                },
-            },
-        }
-    ]
+    # tools = [{
+    #         "type": "function",
+    #         "function": {
+    #             "name": "get_weather",
+    #             "description": "Get the current weather in a given location",
+    #             "parameters": {
+    #                 "type": "object",
+    #                 "properties": {
+    #                     "location": {
+    #                         "type": "string",
+    #                         "description": "The city and state, e.g. San Francisco, CA",
+    #                     },
+    #                 },
+    #                 "required": ["location"],
+    #             }
+    #         }
+    #     }]
+    
 
-    response = openai_client.send_message(messages, tools=tools)
+    orkes_tool = OrkesToolSchema(name="get_weather",
+                                    description="Get the current weather in a given location",
+                                    parameters={
+                                        "type": "object",
+                                        "properties": {
+                                            "location": {
+                                                "type": "string",
+                                                "description": "The city and state, e.g. San Francisco, CA",
+                                            },
+                                        },
+                                        "required": ["location"],
+                                    })
+    
+    # actual_tool_payloads = openai_client.provider.get_tools_payload([orkes_tool])
+    # assert actual_tool_payloads == tools, "Tool payload schema does not match expected format."
+
+    response = openai_client.send_message(messages, tools=[orkes_tool])
     
     result = response['content']
     content_type = result.get("content_type")
@@ -155,26 +171,42 @@ async def test_gemini_with_tool_calling_live():
     gemini_client = LLMFactory.create_gemini(api_key=gemini_api_key)
     
     messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "What is the weather in San Francisco?"}])
-    tools = [{
-        "function_declarations": [
-            {
-                "name": "get_weather",
-                "description": "Get the current weather in a given location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {
-                            "type": "string",
-                            "description": "The city and state, e.g. San Francisco, CA",
-                        },
-                    },
-                    "required": ["location"],
-                },
-            }
-        ]
-    }]
+    # tools = [{
+    #     "function_declarations": [
+    #         {
+    #             "name": "get_weather",
+    #             "description": "Get the current weather in a given location",
+    #             "parameters": {
+    #                 "type": "object",
+    #                 "properties": {
+    #                     "location": {
+    #                         "type": "string",
+    #                         "description": "The city and state, e.g. San Francisco, CA",
+    #                     },
+    #                 },
+    #                 "required": ["location"],
+    #             },
+    #         }
+    #     ]
+    # }]
     
-    response = gemini_client.send_message(messages, tools=tools)
+    orkes_tool = OrkesToolSchema(name="get_weather",
+                                    description="Get the current weather in a given location",
+                                    parameters={
+                                        "type": "object",
+                                        "properties": {
+                                            "location": {
+                                                "type": "string",
+                                                "description": "The city and state, e.g. San Francisco, CA",
+                                            },
+                                        },
+                                        "required": ["location"],
+                                    })
+    
+    # actual_tool_payloads = gemini_client.provider.get_tools_payload([orkes_tool])
+    # print("here: ", actual_tool_payloads)
+    # assert actual_tool_payloads == tools, "Tool payload schema does not match expected format."
+    response = gemini_client.send_message(messages, tools=[orkes_tool])
     
     result = response['content']
     content_type = result.get("content_type")

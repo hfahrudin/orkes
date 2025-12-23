@@ -4,7 +4,7 @@ import os
 import pytest
 import json
 from orkes.services.connectors import LLMFactory
-from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema
+from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema, OrkesToolSchema
 
 from dotenv import load_dotenv
 
@@ -106,27 +106,20 @@ async def test_openai_style_tool_calling_mock(mock_server):
     )
     
     messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "What is the weather in San Francisco?"}])
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-                "description": "Get the current weather in a given location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {
-                            "type": "string",
-                            "description": "The city and state, e.g. San Francisco, CA",
-                        },
-                    },
-                    "required": ["location"],
-                },
-            },
-        }
-    ]
+    orkes_tool = OrkesToolSchema(name="get_weather",
+                                    description="Get the current weather in a given location",
+                                    parameters={
+                                        "type": "object",
+                                        "properties": {
+                                            "location": {
+                                                "type": "string",
+                                                "description": "The city and state, e.g. San Francisco, CA",
+                                            },
+                                        },
+                                        "required": ["location"],
+                                    })
 
-    response = vllm_client.send_message(messages, tools=tools)
+    response = vllm_client.send_message(messages, tools=[orkes_tool])
     
     result = response['content']
     content_type = result.get("content_type")
@@ -148,27 +141,21 @@ async def test_gemini_tool_calling_mock(mock_server):
     )
     
     messages = OrkesMessagesSchema(messages = [{"role": "user", "content": "What is the weather in San Francisco?"}])
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-                "description": "Get the current weather in a given location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {
-                            "type": "string",
-                            "description": "The city and state, e.g. San Francisco, CA",
-                        },
-                    },
-                    "required": ["location"],
-                },
-            },
-        }
-    ]
+    orkes_tool = OrkesToolSchema(name="get_weather",
+                                    description="Get the current weather in a given location",
+                                    parameters={
+                                        "type": "object",
+                                        "properties": {
+                                            "location": {
+                                                "type": "string",
+                                                "description": "The city and state, e.g. San Francisco, CA",
+                                            },
+                                        },
+                                        "required": ["location"],
+                                    })
+    
 
-    response = gemini_client.send_message(messages, tools=tools)
+    response = gemini_client.send_message(messages, tools=[orkes_tool])
     
     result = response['content']
     content_type = result.get("content_type")

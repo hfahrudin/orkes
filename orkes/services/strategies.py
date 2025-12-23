@@ -191,7 +191,7 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
                 "parameters": dump["parameters"]
             }
             tools_payloads.append(tool_dict)    
-        return  tools_payloads
+        return  [{"function_declarations" : tools_payloads}]
 
     def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[OrkesToolSchema]] = None) -> Dict:
         message_payload = self.get_messages_payload(messages)
