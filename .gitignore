@@ -9,3 +9,4 @@ upload.py
 legacy/
 .pytest_cache
 tests/reports/
+traces/

@@ -5,7 +5,7 @@ import uuid
 import os
 from typing import Dict, Union, Optional
 from orkes.graph.unit import ForwardEdge, ConditionalEdge
-from orkes.graph.schema import NodePoolItem
+from orkes.graph.schema import NodePoolItem, TracesSchema, EdgeTrace
 from orkes.graph.unit import _EndNode, _StartNode
 
 class GraphRunner:
@@ -13,16 +13,21 @@ class GraphRunner:
         self.state_def = graph_type
         self.nodes_pool = nodes_pool
         self.graph_state: Dict = {}
-        self.trace = []
         self.run_id = str(uuid.uuid4())
+        self.trace = TracesSchema(
+            run_id=self.run_id,
+            nodes_trace=[v.node.node_trace for k, v in nodes_pool.items()],
+            edges_trace=[]
+        )
         self.traces_dir = traces_dir
+        self.run_number = 0
 
     def save_run_trace(self):
         if not os.path.exists(self.traces_dir):
             os.makedirs(self.traces_dir)
         filename = os.path.join(self.traces_dir, f"trace_{self.run_id}.json")
         with open(filename, 'w') as f:
-            json.dump(self.trace, f, indent=4)
+            json.dump(self.trace.model_dump(), f, indent=4)
 
     #TODO: Modifications are returned as a new copy, not in-place mutation.
     def run(self, invoke_state):
@@ -53,6 +58,14 @@ class GraphRunner:
             )
         else:
             current_edge.passes+=1
+            self.run_number += 1
+
+        edge_trace = current_edge.edge_trace.model_copy()
+        edge_trace.edge_run_number = self.run_number 
+        edge_trace.passes_left = current_edge.max_passes - current_edge.passes
+        edge_trace.timestamp = time.time()
+        edge_trace.state_snapshot = input_state.copy()
+
 
         current_node = current_edge.from_node.node
         
@@ -77,7 +90,9 @@ class GraphRunner:
             
             next_node = self.nodes_pool[next_node_name].node
             next_edge = self.nodes_pool[next_node_name].edge
-
+            edge_trace.to_node = next_node_name
+        self.trace.edges_trace.append(edge_trace)
+        
         if not isinstance(next_node, _EndNode):
             next_input = self.graph_state.copy()
             self.traverse_graph( next_edge, next_input)

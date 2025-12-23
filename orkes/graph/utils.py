@@ -1,5 +1,6 @@
 import inspect
 from typing import Callable
+import random
 
 def function_assertion(func: Callable, expected_type: type) -> bool:
     sig = inspect.signature(func)
@@ -14,3 +15,7 @@ def is_typeddict_class(obj) -> bool:
 
 def check_dict_values_type(d: dict, cls: type) -> bool:
     return all(isinstance(v, cls) for v in d.values())
+
+def randomize_color_hex() -> str:
+
+    return "#{:06x}".format(random.randint(0, 0xFFFFFF))

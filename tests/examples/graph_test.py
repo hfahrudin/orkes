@@ -8,41 +8,65 @@ class State(TypedDict):
     multiply_result: int
     condition_result: bool
 
-# Node functions
 def add_3(state: State):
+    """
+    Initializes the workflow by adding 3 to the starting input.
+    - Input: state['initial']
+    - Output: Updates state['add_result']
+    """
     result = state.get('initial', 0) + 3
     state['add_result'] = result
     return state
 
 def multiply_by_2(state: State):
-    value = state.get('add_result', 0)
-    rand_value = random.randint(1,10)
+    """
+    Core processing node. Generates a random number and scales it.
+    This node acts as the loop entry point if the condition fails.
+    - Logic: (Random 1-10) * 2
+    - Output: Updates state['multiply_result']
+    """
+    rand_value = random.randint(1,7)
     result = rand_value * 2
     state['multiply_result'] = result
     return state
 
 def greater_than_10(state: State):
+    """
+    Evaluator node that checks if the current result meets the threshold.
+    - Logic: multiply_result > 10
+    - Output: Sets state['condition_result'] (bool)
+    """
     value = state.get('multiply_result', 0)
     result = value > 10
     state['condition_result'] = result
     return state
 
-# Add the branching nodes
 def path_true_node(state: State):
+    """
+    Success terminal path. Executes when the condition is met.
+    - Flow: Transitions to END_node.
+    """
     print("Condition was True!")
     return state
 
 def path_false_node(state: State):
+    """
+    Failure/Retry path. Executes when the condition is not met.
+    - Flow: Loops back to multiply_by_2.
+    """
     print("Condition was False!")
     return state
 
-
 def conditional_node(state: State):
-    # Example: check the condition_result
+    """
+    The router/edge logic. 
+    Determines the next node based on the boolean result in the state.
+    - Returns: 'true' (path_true) or 'false' (path_false)
+    """
     if state.get('condition_result', False):
-        return 'true'   # name of the next node if condition is True
+        return 'true'
     else:
-        return 'false'  # name of the next node if condition is False
+        return 'false'
 
 # --- Initialize Graph ---
 agent_graph = OrkesGraph(State)
