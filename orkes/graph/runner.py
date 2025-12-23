@@ -1,14 +1,28 @@
 
-from typing import Dict, Union
+import json
+import time
+import uuid
+import os
+from typing import Dict, Union, Optional
 from orkes.graph.unit import ForwardEdge, ConditionalEdge
 from orkes.graph.schema import NodePoolItem
 from orkes.graph.unit import _EndNode, _StartNode
 
 class GraphRunner:
-    def __init__(self, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict):
+    def __init__(self, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces"):
         self.state_def = graph_type
         self.nodes_pool = nodes_pool
         self.graph_state: Dict = {}
+        self.trace = []
+        self.run_id = str(uuid.uuid4())
+        self.traces_dir = traces_dir
+
+    def save_run_trace(self):
+        if not os.path.exists(self.traces_dir):
+            os.makedirs(self.traces_dir)
+        filename = os.path.join(self.traces_dir, f"trace_{self.run_id}.json")
+        with open(filename, 'w') as f:
+            json.dump(self.trace, f, indent=4)
 
     #TODO: Modifications are returned as a new copy, not in-place mutation.
     def run(self, invoke_state):
@@ -24,7 +38,10 @@ class GraphRunner:
         # Start traversal
         start_pool = self.nodes_pool['START']
         start_edges = start_pool.edge
+        
         self.traverse_graph(start_edges, input_state)
+        
+        self.save_run_trace()
         return self.graph_state
 
     def traverse_graph(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
@@ -43,11 +60,9 @@ class GraphRunner:
             if not isinstance(current_node, _StartNode):
                 result =  current_node.execute(input_state)
                 self.graph_state.update(result)
-            
+
             next_edge = current_edge.to_node.edge
             next_node = current_edge.to_node.node
-            # result = current_node.execute(input_state)
-            # next_node = current_node.edge
 
 
         elif current_edge.edge_type == "__conditional__":
@@ -59,6 +74,7 @@ class GraphRunner:
             result_gate = gate_function(self.graph_state)
 
             next_node_name = condition[result_gate]
+            
             next_node = self.nodes_pool[next_node_name].node
             next_edge = self.nodes_pool[next_node_name].edge
 

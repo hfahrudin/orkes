@@ -70,6 +70,8 @@ class OrkesGraph:
         edge = ConditionalEdge(from_node_item, gate_function, condition, max_passes=max_passes)
         self._edges_pool.append(edge)
         self._nodes_pool[from_node_item.node.name].edge = edge
+        if "END" in condition.values():
+            self._nodes_pool["END"].edge = "<END GRAPH TOKEN>"
 
     def _validate_condition(self, condition: Dict[str, Union[str, Node]]):
         for key, target in condition.items():
