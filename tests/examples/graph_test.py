@@ -1,11 +1,6 @@
-#FOR LOCAL TESTING
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from orkes.graph.core import OrkesGraph
 from typing import TypedDict
-
+import random
 # Define the state structure
 class State(TypedDict):
     initial: int
@@ -21,7 +16,8 @@ def add_3(state: State):
 
 def multiply_by_2(state: State):
     value = state.get('add_result', 0)
-    result = value * 2
+    rand_value = random.randint(1,10)
+    result = rand_value * 2
     state['multiply_result'] = result
     return state
 
@@ -46,7 +42,7 @@ def conditional_node(state: State):
     if state.get('condition_result', False):
         return 'true'   # name of the next node if condition is True
     else:
-        return 'path_false'  # name of the next node if condition is False
+        return 'false'  # name of the next node if condition is False
 
 # --- Initialize Graph ---
 agent_graph = OrkesGraph(State)
@@ -66,9 +62,9 @@ agent_graph.add_edge('add_3', 'multiply_by_2')
 agent_graph.add_edge('multiply_by_2', 'greater_than_10')
 agent_graph.add_conditional_edge('greater_than_10', conditional_node, {'true' : 'path_true', 'false' : 'path_false'})
 
-
+agent_graph.add_edge('path_false', 'multiply_by_2')
 agent_graph.add_edge('path_true', END_node)
-agent_graph.add_edge('path_false', END_node)
+
 # Compile the graph
 runner = agent_graph.compile()
 

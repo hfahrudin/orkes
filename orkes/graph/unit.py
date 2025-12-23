@@ -17,6 +17,7 @@ class Node:
         self.func: Callable = func
         self.graph_state = graph_state
         self.id = "node_"+str(uuid.uuid4())
+        self.description = func.__doc__
 
     def execute(self, input_state) -> Any:
         output = self.func(input_state)
