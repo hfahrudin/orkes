@@ -1,0 +1,69 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background: #f0f2f5; }
+        #mynetwork { flex: 3; background: white; margin: 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #inspector { flex: 1; padding: 20px; border-left: 1px solid #ddd; background: #ffffff; overflow-y: auto; }
+        .card { border-radius: 8px; padding: 15px; margin-top: 10px; }
+        .node-card { border-left: 6px solid #007bff; background: #e7f3ff; }
+        .edge-card { border-left: 6px solid #6c757d; background: #f8f9fa; }
+        .key { font-weight: bold; color: #444; text-transform: capitalize; display: inline-block; width: 100px; }
+        .header { display: flex; align-items: center; justify-content: space-between; }
+        .type-pill { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: #333; color: white; }
+    </style>
+</head>
+<body>
+    <div id="mynetwork"></div>
+    <div id="inspector">
+        <h3>Inspector</h3>
+        <div id="content">Click a Node or an Edge (line) to see details.</div>
+    </div>
+
+    <script type="text/javascript">
+        const nodes = new vis.DataSet([{"id": "START", "label": "ENTRY NODE", "shape": "circle", "color": "#4dabf7", "layer": "ingress", "meta": "Source System"}, {"id": "LB", "label": "Load Balancer", "shape": "diamond", "color": "#ff922b", "status": "Active"}, {"id": "W1", "label": "Worker Alpha", "shape": "box", "color": "#51cf66", "load": "12%"}, {"id": "W2", "label": "Worker Beta", "shape": "box", "color": "#f06595", "load": "88%"}, {"id": "VAL", "label": "Data Validator", "shape": "box", "color": "#cc5de8", "checks": "Schema, Auth"}, {"id": "RETRY", "label": "Retry Logic", "shape": "ellipse", "color": "#ff8787", "delay": "500ms"}, {"id": "EXIT", "label": "EXIT NODE", "shape": "circle", "color": "#20c997", "layer": "egress", "meta": "Final Destination"}]);
+        const edges = new vis.DataSet([{"from": "START", "to": "LB", "label": "Request", "secure": true}, {"from": "LB", "to": "W1", "path": "primary"}, {"from": "LB", "to": "W2", "path": "secondary"}, {"from": "W1", "to": "VAL"}, {"from": "W2", "to": "VAL"}, {"from": "VAL", "to": "RETRY", "label": "Fail", "dashes": true}, {"from": "RETRY", "to": "START", "label": "Re-ingress", "dashes": true}, {"from": "VAL", "to": "EXIT", "label": "Success", "width": 3}]);
+
+        const container = document.getElementById('mynetwork');
+        const network = new vis.Network(container, { nodes, edges }, {
+            edges: { arrows: 'to', font: { size: 11, color: '#888' }, color: { inherit: 'both' } },
+            physics: { enabled: true, solver: 'repulsion' },
+            interaction: { hover: true }
+        });
+
+        network.on("click", function (params) {
+            let html = "";
+            let targetData = null;
+            let type = "";
+
+            if (params.nodes.length > 0) {
+                // NODE WAS CLICKED
+                targetData = nodes.get(params.nodes[0]);
+                type = "NODE";
+                html = `<div class="card node-card"><div class="header"><h4>${targetData.label || 'Unnamed Node'}</h4><span class="type-pill">NODE</span></div>`;
+            } else if (params.edges.length > 0) {
+                // EDGE WAS CLICKED
+                targetData = edges.get(params.edges[0]);
+                type = "EDGE";
+                const fromNode = nodes.get(targetData.from).label;
+                const toNode = nodes.get(targetData.to).label;
+                html = `<div class="card edge-card"><div class="header"><h4>Connection</h4><span class="type-pill">EDGE</span></div><p><b>${fromNode}</b> &rarr; <b>${toNode}</b></p>`;
+            }
+
+            if (targetData) {
+                for (let key in targetData) {
+                    // Skip internal Vis.js/styling properties
+                    if (['id', 'from', 'to', 'shape', 'color', 'label', 'dashes'].includes(key)) continue;
+                    html += `<div style="margin-bottom:5px;"><span class="key">${key.replace('_', ' ')}:</span> <span>${targetData[key]}</span></div>`;
+                }
+                html += '</div>';
+                document.getElementById('content').innerHTML = html;
+            } else {
+                document.getElementById('content').innerHTML = "Click a Node or an Edge (line) to see details.";
+            }
+        });
+    </script>
+</body>
+</html>
