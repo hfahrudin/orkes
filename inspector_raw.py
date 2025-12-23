@@ -212,7 +212,7 @@ def generate_inspector_html(trace_file):
 
                 if (targetData) {
                     for (let key in targetData) {
-                        if (['id', 'from', 'to', 'shape', 'color', 'label', 'x', 'y', 'dashes', 'width',].includes(key)) continue;
+                        if (['id', 'from', 'to', 'shape', 'color', 'label', 'x', 'y', 'dashes', 'width', 'node_name'].includes(key)) continue;
                         let val = targetData[key];
                         let display = (typeof val === 'object') ? `<pre class="json-box">${JSON.stringify(val, null, 2)}</pre>` : val;
                         html += `<div class="prop-row"><span class="key">${key}:</span><div class="value">${display}</div></div>`;
