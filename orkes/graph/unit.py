@@ -101,7 +101,7 @@ class Edge(ABC):
             to_node=self.to_node.node.name if self.to_node else "N/A",
             passes_left=self.max_passes,
             edge_type=self.edge_type,
-            timestamp=0.0,
+            elapsed=0.0,
             meta={}
         )
 
@@ -135,7 +135,7 @@ class ForwardEdge(Edge):
             to_node=self.to_node.node.name if self.to_node else "N/A",
             passes_left=self.max_passes,
             edge_type=self.edge_type,
-            timestamp=0.0,
+            elapsed=0.0,
             meta={
                 "type": "forward_edge"
             })
@@ -174,7 +174,7 @@ class ConditionalEdge(Edge):
             to_node=self.to_node.node.name if self.to_node else "N/A",
             passes_left=self.max_passes,
             edge_type=self.edge_type,
-            timestamp=0.0,
+            elapsed=0.0,
             meta={
                 "type": "conditional_edge"
             }

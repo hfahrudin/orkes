@@ -1,0 +1,245 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Execution Trace View - Orkes</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link rel="icon" href="https://i.ibb.co/4GC2LK1/orkes-icon.png" type="image/x-icon">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; height: 100vh; overflow: hidden; background: #f0f2f5; }
+        #mynetwork { width: 100%; height: 100%; background: #ffffff; }
+        
+        /* --- TITLE CARD STYLES --- */
+        #title-card {
+            position: absolute; top: 20px; left: 20px; 
+            background: #ffffff; 
+            /* Remove padding here, we will put it on children for better collapse animation */
+            padding: 0; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            z-index: 1000; 
+            border: 1px solid #e1e4e8;
+            min-width: 250px;
+            overflow: hidden; /* Important for animation */
+            transition: height 0.2s ease; /* smooth resize */
+        }
+
+        .title-header {
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #343a40; 
+            color: white;
+            border-bottom: 1px solid transparent; /* invisible border usually */
+        }
+
+        /* When minimized, remove bottom padding/border/etc */
+        #title-card.minimized .title-header {
+            border-bottom: 0px solid transparent;
+        }
+        
+        .title-main {
+            color: white;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        /* The container for all subtitles */
+        #title-card-body {
+            padding: 10px 15px 12px 15px; /* Side padding matches header */
+            display: block;
+            max-height: 500px; /* An arbitrary large number larger than actual content */
+            opacity: 1;
+            overflow: hidden; /* Essential for hiding content as it shrinks */
+            transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+        }
+
+        /* HIDING LOGIC */
+        #title-card.minimized #title-card-body {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        .title-sub {
+
+            font-size: 12px;
+            color: #000000; /* Muted gray */
+            margin-top: 2px;
+            font-family: monospace; /* Best for IDs */
+
+        }
+
+        /* Small generic button style (reused from your inspector) */
+        .min-btn-title {
+            background: #555; border: none; color: #999; 
+            font-size: 18px; font-weight: bold; cursor: pointer;
+            width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px;
+        }
+        .min-btn-title:hover { background: #f0f0f0; color: #333; }
+
+        /* Inspector Base */
+        #inspector { 
+            position: absolute; top: 20px; right: 20px; width: 400px; height: 600px;
+            min-width: 300px; min-height: 40px; background: #ffffff; border-radius: 8px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: flex; flex-direction: column;
+            border: 1px solid #ccc; resize: both; overflow: hidden; z-index: 1000;
+            transition: height 0.2s ease-in-out;
+        }
+
+        /* Minimized State */
+        #inspector.minimized {
+            height: 42px !important; /* Only header height */
+            min-height: 42px !important;
+            resize: none;
+        }
+
+        #inspector-header { 
+            padding: 10px 15px; cursor: move; background: #343a40; color: white; 
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none; flex-shrink: 0;
+        }
+
+        .header-controls { display: flex; align-items: center; gap: 10px; }
+        
+        .min-btn {
+            background: #555; border: none; color: white; border-radius: 4px;
+            width: 24px; height: 24px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; font-weight: bold;
+        }
+        .min-btn:hover { background: #777; }
+
+        #inspector-content-wrapper { flex-grow: 1; overflow-y: auto; padding: 15px; }
+        
+        /* Text Display Fixes */
+        .prop-row { margin-bottom: 8px; display: flex; flex-direction: column; }
+        .key { font-weight: 700; color: #555; font-size: 0.85em; text-transform: uppercase; margin-bottom: 2px; }
+        .value { 
+            color: #222; font-size: 0.95em; word-wrap: break-word; 
+            overflow-wrap: break-word; white-space: pre-wrap;
+        }
+        pre.json-box {
+            background: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; 
+            font-family: monospace; font-size: 0.85em; white-space: pre-wrap; word-break: break-all;
+        }
+        .card { border-radius: 8px; padding: 10px; margin-bottom: 10px; border: 1px solid #e1e4e8; }
+        .node-card { border-left: 5px solid #007bff; background: #f1f8ff; }
+        .edge-card { border-left: 5px solid #6c757d; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div id="title-card">
+        TITLE_CARD_CONTENT
+    </div>
+
+    <div id="mynetwork"></div>
+
+    <div id="inspector">
+        <div id="inspector-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size: 12px; color: #aaa;">&#x2630;</span>
+                <span>Inspector</span>
+            </div>
+            <div class="header-controls">
+                <button class="min-btn" onclick="toggleMinimize()" title="Minimize/Maximize">&minus;</button>
+            </div>
+        </div>
+        <div id="inspector-content-wrapper">
+            <div id="content">Click a Node or an Edge to view details.</div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        const nodes = new vis.DataSet(JSON_NODES);
+        const edges = new vis.DataSet(JSON_EDGES);
+        const container = document.getElementById('mynetwork');
+        const network = new vis.Network(container, { nodes, edges }, {
+            edges: { arrows: 'to', font: { size: 11, color: '#888' }, color: { inherit: 'both' }, smooth: true },
+            physics: { enabled: true, solver: 'forceAtlas2Based' },
+            interaction: { hover: true }
+        });
+
+        // Toggle Minimize
+        let isMinimized = false;
+        let originalHeight = "600px";
+
+        function toggleMinimize() {
+            const insp = document.getElementById('inspector');
+            const btn = document.querySelector('.min-btn');
+            if (!isMinimized) {
+                originalHeight = insp.style.height || "600px";
+                insp.classList.add('minimized');
+                btn.innerHTML = "&#43;"; // Plus sign
+            } else {
+                insp.classList.remove('minimized');
+                insp.style.height = originalHeight;
+                btn.innerHTML = "&minus;"; // Minus sign
+            }
+            isMinimized = !isMinimized;
+        }
+
+        // Toggle Title Card Minimize
+        function toggleTitleCard() {
+            const card = document.getElementById('title-card');
+            const btn = card.querySelector('.min-btn-title');
+            
+            // Toggle class
+            card.classList.toggle('minimized');
+            
+            // Toggle Icon
+            if (card.classList.contains('minimized')) {
+                btn.innerHTML = "&#43;"; // Plus Sign
+            } else {
+                btn.innerHTML = "&minus;"; // Minus Sign
+            }
+        }
+
+        network.on("click", function (params) {
+            if (isMinimized) toggleMinimize(); // Auto-expand on click if minimized
+            
+            let html = "";
+            let targetData = null;
+
+            if (params.nodes.length > 0) {
+                targetData = nodes.get(params.nodes[0]);
+                html = `<div class="card node-card"><h4>${targetData.label}</h4>`;
+            } else if (params.edges.length > 0) {
+                targetData = edges.get(params.edges[0]);
+                html = `<div class="card edge-card"><h4>Edge</h4>`;
+            }
+
+            if (targetData) {
+                for (let key in targetData) {
+                    if (['id', 'from', 'to', 'shape', 'color', 'label', 'x', 'y', 'dashes', 'width', 'node_name'].includes(key)) continue;
+                    let val = targetData[key];
+                    let display = (typeof val === 'object') ? `<pre class="json-box">${JSON.stringify(val, null, 2)}</pre>` : val;
+                    html += `<div class="prop-row"><span class="key">${key}:</span><div class="value">${display}</div></div>`;
+                }
+                document.getElementById('content').innerHTML = html + '</div>';
+            }
+        });
+
+        // Drag Logic
+        dragElement(document.getElementById("inspector"));
+        function dragElement(elmnt) {
+            var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            document.getElementById("inspector-header").onmousedown = function(e) {
+                e = e || window.event;
+                if (e.target.className === 'min-btn') return; // Don't drag if clicking button
+                e.preventDefault();
+                pos3 = e.clientX; pos4 = e.clientY;
+                document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
+                document.onmousemove = (e) => {
+                    pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY;
+                    pos3 = e.clientX; pos4 = e.clientY;
+                    elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+                    elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+                    elmnt.style.right = 'auto'; elmnt.style.bottom = 'auto';
+                };
+            };
+        }
+    </script>
+</body>
+</html>

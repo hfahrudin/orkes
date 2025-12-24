@@ -67,7 +67,7 @@ class EdgeTrace(BaseModel):
     to_node: str
     passes_left: int
     edge_type: Union[str, None]
-    timestamp: float
+    elapsed: float
     state_snapshot: dict = {}
     meta: dict
 
@@ -84,6 +84,10 @@ class TracesSchema(BaseModel):
         edges_trace (list[EdgeTrace]): A list of all edge traces recorded during the
                                        run.
     """
+    graph_name : str
     run_id: str
+    start_time: float = 0.0
+    elapsed_time: float = 0.0
+    status: str = "FAILED"
     nodes_trace: list[NodeTrace]
     edges_trace: list[EdgeTrace]

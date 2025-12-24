@@ -147,7 +147,7 @@ class OrkesGraph:
                 raise RuntimeError(f"Node '{node_name}' has an empty edge.")
         self._freeze = True
         
-        return GraphRunner(nodes_pool=self._nodes_pool, graph_type=self.state)
+        return GraphRunner(graph_name = self.name, nodes_pool=self._nodes_pool, graph_type=self.state)
     
     def detect_loop(self):
         start_pool = self._nodes_pool['START']

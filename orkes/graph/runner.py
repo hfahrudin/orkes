@@ -9,13 +9,15 @@ from orkes.graph.schema import NodePoolItem, TracesSchema, EdgeTrace
 from orkes.graph.unit import _EndNode, _StartNode
 
 class GraphRunner:
-    def __init__(self, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces"):
+    def __init__(self, graph_name:str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces"):
         self.state_def = graph_type
         self.nodes_pool = nodes_pool
         self.graph_state: Dict = {}
         self.run_id = str(uuid.uuid4())
+        self.graph_name = graph_name
         self.trace = TracesSchema(
             run_id=self.run_id,
+            graph_name=self.graph_name,
             nodes_trace=[v.node.node_trace for k, v in nodes_pool.items()],
             edges_trace=[]
         )
@@ -44,8 +46,13 @@ class GraphRunner:
         start_pool = self.nodes_pool['START']
         start_edges = start_pool.edge
         
+        self.trace.start_time = time.time()
+
         self.traverse_graph(start_edges, input_state)
         
+        self.trace.elapsed_time = time.time() - self.trace.start_time
+        self.trace.status = "FINISHED"
+
         self.save_run_trace()
         return self.graph_state
 
@@ -63,7 +70,7 @@ class GraphRunner:
         edge_trace = current_edge.edge_trace.model_copy()
         edge_trace.edge_run_number = self.run_number 
         edge_trace.passes_left = current_edge.max_passes - current_edge.passes
-        edge_trace.timestamp = time.time()
+        start = time.time()
         edge_trace.state_snapshot = input_state.copy()
 
 
@@ -91,6 +98,7 @@ class GraphRunner:
             next_node = self.nodes_pool[next_node_name].node
             next_edge = self.nodes_pool[next_node_name].edge
             edge_trace.to_node = next_node_name
+        edge_trace.elapsed = time.time() - start
         self.trace.edges_trace.append(edge_trace)
         
         if not isinstance(next_node, _EndNode):

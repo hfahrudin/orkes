@@ -1,5 +1,29 @@
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
+import datetime
+
+def format_start_time(start_time: float) -> str:
+    """
+    Convert a Unix timestamp to 'YYYY-MM-DD HH:MM:SS'
+    """
+    dt = datetime.datetime.fromtimestamp(start_time)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+def format_elapsed_time(elapsed_seconds: float) -> str:
+    """
+    Format elapsed time as:
+    'Xm Ys Zms Wus'
+
+    - Minutes do not roll into hours
+    - All units are always shown
+    """
+    total_us = int(elapsed_seconds * 1_000_000)
+
+    total_seconds, microseconds = divmod(total_us, 1_000_000)
+    minutes, seconds = divmod(total_seconds, 60)
+    milliseconds, microseconds = divmod(microseconds, 1_000)
+
+    return f"{minutes}m {seconds}s {milliseconds}ms {microseconds}us"
 
 class ToolParameter(BaseModel):
     """Represents the JSON Schema for tool parameters."""
