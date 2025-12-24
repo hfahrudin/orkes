@@ -1,0 +1,11 @@
+version: 2
+
+build:
+  os: ubuntu-latest
+  tools:
+    python:
+      version: "3.10"
+
+python:
+  install:
+    - requirements: requirement.txt

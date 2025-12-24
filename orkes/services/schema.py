@@ -5,69 +5,157 @@ from pydantic import BaseModel
 from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
 
 class ToolCallSchema(BaseModel):
-    """Schema for tool call information in LLM request."""
+    """
+    Represents a tool call requested by the LLM.
+
+    This schema defines the structure of a tool call, which includes the name of the
+    function to be called and the arguments to pass to it.
+
+    Attributes:
+        function_name (str): The name of the function to be called.
+        arguments (Dict[str, Any]): A dictionary of arguments for the function.
+    """
     function_name: str
     arguments: Dict[str, Any]
 
 class RequestSchema(BaseModel):
-    """Schema for a standard LLM response."""
+    """
+    Represents a standard response from an LLM.
+
+    This schema defines the structure of a response from an LLM, which can be either
+    a string of content or a list of tool calls.
+
+    Attributes:
+        content_type (str): The type of content in the response, either 'text' or
+                            'tool_calls'.
+        content (Union[str, List[ToolCallSchema]]): The content of the response.
+    """
     content_type: str
     content : Union[str, List[ToolCallSchema]]
 
 class LLMProviderStrategy(ABC):
     """
-    Strategy interface for handling provider-specific logic.
-    Responsible for payload structure and parsing responses.
+    An abstract base class for LLM provider strategies.
+
+    This class defines the interface for handling provider-specific logic, such as
+    preparing payloads, parsing responses, and generating headers.
     """
 
     @abstractmethod
     def prepare_payload(self, model: str, messages:OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
-        """Convert standard messages to provider-specific JSON payload."""
+        """
+        Prepares the payload for a request to the LLM provider.
+
+        Args:
+            model (str): The name of the model to use.
+            messages (OrkesMessagesSchema): The messages to send to the LLM.
+            stream (bool): Whether to stream the response.
+            settings (Dict): A dictionary of settings for the request.
+            tools (Optional[List[Dict]], optional): A list of tools to provide to the
+                LLM. Defaults to None.
+
+        Returns:
+            Dict: The prepared payload.
+        """
         pass
 
     @abstractmethod
     def parse_response(self, response_data: Dict) -> RequestSchema:
-        """Extract text content from a llm reqeust."""
+        """
+        Parses a response from the LLM provider.
+
+        Args:
+            response_data (Dict): The response data from the provider.
+
+        Returns:
+            RequestSchema: The parsed response.
+        """
         pass
 
     @abstractmethod
     def parse_stream_chunk(self, chunk: str) -> Optional[str]:
-        """Extract text content from a streaming chunk line."""
+        """
+        Parses a single chunk of a streaming response.
+
+        Args:
+            chunk (str): A chunk of the response.
+
+        Returns:
+            Optional[str]: The parsed content of the chunk, or None if the chunk is
+                           empty.
+        """
         pass
     
     @abstractmethod
     def get_headers(self, api_key: str) -> Dict[str, str]:
-        """Return authentication headers."""
+        """
+        Gets the authentication headers for the LLM provider.
+
+        Args:
+            api_key (str): The API key for the provider.
+
+        Returns:
+            Dict[str, str]: A dictionary of headers.
+        """
         pass
 
     @abstractmethod
     def get_messages_payload(self, messages: OrkesMessagesSchema):
-        """Convert Orkes message schema to suitable format for specific LLM inference payload."""
+        """
+        Converts an Orkes message schema to a format suitable for the LLM provider.
+        """
         pass
 
     @abstractmethod
     def get_tools_payload(self, messages: List[OrkesToolSchema]):
-        """Convert Orkes tools schema to suitable format for specific LLM inference payload."""
+        """
+        Converts an Orkes tool schema to a format suitable for the LLM provider.
+        """
         pass
 
 
 class LLMInterface(ABC):
     """
-    Abstract base class for LLM connections.
-    Defines methods to send, streams.
+    An abstract base class for LLM connections.
+
+    This class defines the interface for sending and streaming messages to an LLM,
+    as well as for performing health checks.
     """
 
     @abstractmethod
     def send_message(self, message, **kwargs) -> Response:
-        """Send a message and receive the full response."""
+        """
+        Sends a message to the LLM and receives the full response.
+
+        Args:
+            message: The message to send.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: The response from the LLM.
+        """
         pass
     
     @abstractmethod
     def stream_message(self, message, **kwargs) -> AsyncGenerator[str, None]:
-        """Stream the response incrementally."""
+        """
+        Streams the response from the LLM incrementally.
+
+        Args:
+            message: The message to send.
+            **kwargs: Additional keyword arguments.
+
+        Yields:
+            str: A chunk of the response.
+        """
         pass
 
     @abstractmethod
     def health_check(self) -> Response:
-        """Check the server's health status."""
+        """
+        Checks the health status of the LLM server.
+
+        Returns:
+            Response: The response from the health check.
+        """
         pass

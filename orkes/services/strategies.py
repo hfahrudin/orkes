@@ -7,26 +7,40 @@ from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
 #TODO: STANDARIZED FOR STREAM
 class OpenAIStyleStrategy(LLMProviderStrategy):
     """
-    Handles OpenAI, vLLM, DeepSeek, and other compatible APIs.
+    A strategy for interacting with LLM providers that follow the OpenAI API format.
+    This includes providers like OpenAI, vLLM, DeepSeek, and other compatible APIs.
     """
     def get_headers(self, api_key: str) -> Dict[str, str]:
+        """
+        Returns the headers required for authentication with an OpenAI-style API.
+        """
         return {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
 
-    def get_messages_payload(self, messages: OrkesMessagesSchema):
+    def get_messages_payload(self, messages: OrkesMessagesSchema) -> Dict[str, List[Dict]]:
+        """
+        Converts an OrkesMessagesSchema into the format expected by an OpenAI-style API.
+        """
         processed_messages = [msg.model_dump() for msg in messages.messages]
         return {"messages": processed_messages}
     
-    def get_tools_payload(self, tools: List[OrkesToolSchema]):
+    def get_tools_payload(self, tools: List[OrkesToolSchema]) -> List[Dict]:
+        """
+        Converts a list of OrkesToolSchema objects into the format expected by an
+        OpenAI-style API.
+        """
         tool_payloads = [{
                 "type": "function",
                 "function": tool.model_dump()
             } for tool in tools]
-        return  tool_payloads
+        return tool_payloads
 
     def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[OrkesToolSchema]] = None) -> Dict:
+        """
+        Prepares the full payload for a request to an OpenAI-style API.
+        """
         message_payload = self.get_messages_payload(messages)
         payload = {
             "model": model,
@@ -39,14 +53,18 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
         return payload
 
     def parse_response(self, response_data: Dict) -> RequestSchema:
+        """
+        Parses a response from an OpenAI-style API.
+        """
         try:
             message = response_data['choices'][0]['message']
             if 'tool_calls' in message and message['tool_calls']:
                 tools_called = []
                 for tool_call in message['tool_calls']:
-
-                    tool_schema =  ToolCallSchema(function_name=tool_call['function']['name'],
-                                                 arguments=json.loads(tool_call['function']['arguments']))
+                    tool_schema = ToolCallSchema(
+                        function_name=tool_call['function']['name'],
+                        arguments=json.loads(tool_call['function']['arguments'])
+                    )
                     tools_called.append(tool_schema)
                 return RequestSchema(content_type="tool_calls", content=tools_called)
             return RequestSchema(content_type="message", content=message['content'])
@@ -55,9 +73,12 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
             raise ValueError(f"Unexpected response format: {response_data}")
 
     def parse_stream_chunk(self, line: str) -> Optional[str]:
+        """
+        Parses a single chunk of a streaming response from an OpenAI-style API.
+        """
         if not line.startswith("data: "):
             return None
-        data_str = line[6:]  # Strip 'data: '
+        data_str = line[6:]
         if data_str.strip() == "[DONE]":
             return None
         try:
@@ -67,20 +88,27 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
         except json.JSONDecodeError:
             return None
 
-#TODO: validate first
 class AnthropicStrategy(LLMProviderStrategy):
-    """Handles Claude / Anthropic specific API formats."""
+    """
+    A strategy for interacting with the Anthropic API (Claude).
+    """
     def get_headers(self, api_key: str) -> Dict[str, str]:
+        """
+        Returns the headers required for authentication with the Anthropic API.
+        """
         return {
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "Content-Type": "application/json"
         }
 
-    def get_messages_payload(self, messages: OrkesMessagesSchema):
+    def get_messages_payload(self, messages: OrkesMessagesSchema) -> Dict[str, Union[str, List[Dict]]]:
+        """
+        Converts an OrkesMessagesSchema into the format expected by the Anthropic API.
+        """
         processed_messages = [msg.model_dump() for msg in messages.messages]
 
-        # Anthropic requires 'system' to be top-level, separate from 'messages'
+        # Anthropic requires 'system' to be a top-level parameter.
         system_msg = next((msg['content'] for msg in processed_messages if msg['role'] == 'system'), None)
         chat_messages = [msg for msg in processed_messages if msg['role'] != 'system']
 
@@ -90,16 +118,23 @@ class AnthropicStrategy(LLMProviderStrategy):
         
         return message_payload
     
-    def get_tools_payload(self, tools: List[OrkesToolSchema]):
+    def get_tools_payload(self, tools: List[OrkesToolSchema]) -> List[Dict]:
+        """
+        Converts a list of OrkesToolSchema objects into the format expected by the
+        Anthropic API.
+        """
         tool_payloads = [{
                 "name": tool.name,
                 "description": tool.description,
                 "input_schema": tool.parameters.model_dump()
             }
             for tool in tools]
-        return  tool_payloads
+        return tool_payloads
 
     def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[OrkesToolSchema]] = None) -> Dict:
+        """
+        Prepares the full payload for a request to the Anthropic API.
+        """
         message_payload = self.get_messages_payload(messages)
         
         payload = {
@@ -110,37 +145,34 @@ class AnthropicStrategy(LLMProviderStrategy):
         }
         
         if tools:
-            payload["tools"] = tools
+            payload["tools"] = self.get_tools_payload(tools)
 
         return payload
 
-    def parse_response(self, response_data: Dict) -> str:
-        
+    def parse_response(self, response_data: Dict) -> RequestSchema:
+        """
+        Parses a response from the Anthropic API.
+        """
         try:
-            # Anthropic path: content is a list of blocks
             content_blocks = response_data.get('content', [])
             
             tools_called = []
             text_parts = []
 
             for block in content_blocks:
-                # 1. Check for Tool Use (Anthropic uses 'tool_use' type)
                 if block.get('type') == 'tool_use':
                     tool_schema = ToolCallSchema(
-                        name=block['name'],
-                        arguments=block.get('input', {}), # Already a dict
-                        id=block['id']                    # Anthropic ALWAYS provides a tool_use ID
+                        function_name=block['name'],
+                        arguments=block.get('input', {}),
                     )
                     tools_called.append(tool_schema)
                 
-                # 2. Check for Text blocks
                 elif block.get('type') == 'text':
                     text_parts.append(block['text'])
 
             if tools_called:
                 return RequestSchema(content_type="tool_calls", content=tools_called)
             
-            # Join all text blocks if there were multiple
             full_text = "\n".join(text_parts)
             return RequestSchema(content_type="message", content=full_text)
 
@@ -148,6 +180,9 @@ class AnthropicStrategy(LLMProviderStrategy):
             raise ValueError(f"Unexpected Anthropic response format: {response_data}")
 
     def parse_stream_chunk(self, line: str) -> Optional[str]:
+        """
+        Parses a single chunk of a streaming response from the Anthropic API.
+        """
         if not line.startswith("data: "):
             return None
         try:
@@ -159,19 +194,24 @@ class AnthropicStrategy(LLMProviderStrategy):
             return None
 
 class GoogleGeminiStrategy(LLMProviderStrategy):
-    """Handles Google Gemini REST API formats."""
+    """
+    A strategy for interacting with the Google Gemini REST API.
+    """
     def get_headers(self, api_key: str) -> Dict[str, str]:
-        # Google often passes API key via query param, but can use header for some setups.
-        # This implementation assumes standard REST approach; SDK use is usually preferred for Google.
+        """
+        Returns the headers required for authentication with the Google Gemini API.
+        """
         return {
             'X-goog-api-key': api_key,
             "Content-Type": "application/json"
         }
 
-    def get_messages_payload(self, messages: OrkesMessagesSchema):
+    def get_messages_payload(self, messages: OrkesMessagesSchema) -> Dict[str, List[Dict]]:
+        """
+        Converts an OrkesMessagesSchema into the format expected by the Google Gemini API.
+        """
         processed_messages = [msg.model_dump() for msg in messages.messages]
 
-        # Simplistic mapping to Google's "contents" format
         gemini_contents = []
         for msg in processed_messages:
             role = "user" if msg['role'] == "user" else "model"
@@ -181,19 +221,26 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
             })
         return {"contents": gemini_contents}
 
-    def get_tools_payload(self, tools: List[OrkesToolSchema]):
+    def get_tools_payload(self, tools: List[OrkesToolSchema]) -> List[Dict]:
+        """
+        Converts a list of OrkesToolSchema objects into the format expected by the
+        Google Gemini API.
+        """
         tools_payloads = []
         for tool in tools:
             dump = tool.model_dump()
-            tool_dict =  {
+            tool_dict = {
                 "name": dump["name"],
                 "description": dump["description"],
                 "parameters": dump["parameters"]
             }
             tools_payloads.append(tool_dict)    
-        return  [{"function_declarations" : tools_payloads}]
+        return [{"function_declarations" : tools_payloads}]
 
     def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[OrkesToolSchema]] = None) -> Dict:
+        """
+        Prepares the full payload for a request to the Google Gemini API.
+        """
         message_payload = self.get_messages_payload(messages)
 
         if "max_tokens" in settings:
@@ -209,9 +256,11 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
 
         return payload
 
-    def parse_response(self, response_data: Dict) -> str:
+    def parse_response(self, response_data: Dict) -> RequestSchema:
+        """
+        Parses a response from the Google Gemini API.
+        """
         try:
-            # Gemini path: candidates[0] -> content -> parts
             candidate = response_data['candidates'][0]
             parts = candidate.get('content', {}).get('parts', [])
             
@@ -219,16 +268,14 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
             text_content = ""
 
             for part in parts:
-                # 1. Check for Function Calls (Gemini uses 'functionCall' and 'args')
                 if 'functionCall' in part:
                     fc = part['functionCall']
                     tool_schema = ToolCallSchema(
                         function_name=fc['name'],
-                        arguments=fc.get('args', {}) # Already a dict, no json.loads needed
+                        arguments=fc.get('args', {})
                     )
                     tools_called.append(tool_schema)
                 
-                # 2. Check for Text (In case of mixed response or plain message)
                 elif 'text' in part:
                     text_content += part['text']
 
@@ -241,6 +288,9 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
             raise ValueError(f"Unexpected Gemini response format: {response_data}")
 
     def parse_stream_chunk(self, line: str) -> Optional[str]:
+        """
+        Parses a single chunk of a streaming response from the Google Gemini API.
+        """
         if not line.startswith("data: "):
             return None
         data_str = line[6:]

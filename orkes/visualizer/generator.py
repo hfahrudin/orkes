@@ -6,7 +6,7 @@ import os
 import argparse
 from orkes.shared.utils import format_elapsed_time, format_start_time
 
-# Default color palette
+# Default color palette for function nodes in the visualization.
 DEFAULT_FUNCTION_NODE_COLORS = [
     "#E3FAFC", "#D0EBFF", "#C5F6FA", "#E5DBFF", "#D0BFFF",
     "#EDF2FF", "#E9ECEF", "#F1F3F5", "#DEE2E6", "#F3F0FF",
@@ -15,47 +15,55 @@ DEFAULT_FUNCTION_NODE_COLORS = [
 class TraceInspector:
     """
     A class to generate Vis.js compatible HTML visualizations from trace data.
+
+    This class takes a trace of a graph's execution and generates an interactive
+    HTML file that visualizes the graph's structure and execution flow.
+
+    Attributes:
+        template_path (Path): The path to the HTML template file.
+        node_colors (itertools.cycle): An iterator for cycling through the default
+                                       node colors.
+        html_template (str): The content of the HTML template file.
     """
 
     def __init__(self, template_path: Optional[str] = None):
         """
-        Initialize the inspector.
+        Initializes the TraceInspector.
 
         Args:
-            template_path: Path to the HTML template. If None, looks for 
-                           'templates/inspector_template.html' relative to this file.
+            template_path (Optional[str], optional): The path to the HTML template.
+                If not provided, it defaults to 'inspector_template.html' in the
+                same directory as this file.
         """
         if template_path:
             self.template_path = Path(template_path)
         else:
-            # Robustly find the template relative to the library file
+            # Find the template relative to this file.
             self.template_path = Path(__file__).parent / "inspector_template.html"
             
         if not self.template_path.exists():
             raise FileNotFoundError(f"Template not found at: {self.template_path}")
 
-        # specific visual settings
         self.node_colors = itertools.cycle(DEFAULT_FUNCTION_NODE_COLORS)
-
         self.html_template = self.template_path.read_text(encoding='utf-8')
 
-    def _build_title_card(self, title_data:dict = {}) -> str:
-        """Generates the HTML content for the top-left title card with minimize functionality."""
-        
+    def _build_title_card(self, title_data: dict = {}) -> str:
+        """
+        Generates the HTML for the title card in the visualization.
+        """
         data = title_data
         main_title = data.pop('page_title', 'Orkes Trace Visualizer')
         
         status_color_wheel = {
-            "FINISHED": "#007bff",  # Green for finished
-            "FAILED": "#dc3545",    # Red for failed
-            "INTERRUPTED": "#ffc107",   # Yellow for running
+            "FINISHED": "#007bff",
+            "FAILED": "#dc3545",
+            "INTERRUPTED": "#ffc107",
         }
         
         body_rows = []
         status = data.get("Status", "").upper()
-        status_color = status_color_wheel.get(status, "#6c757d")  # Default gray
+        status_color = status_color_wheel.get(status, "#6c757d")
 
-        # add a 'toggleTitle()' onclick event here
         header_html = f'''
             <div class="title-header">
                 <div class="title-main">
@@ -66,33 +74,32 @@ class TraceInspector:
             </div>
         '''
 
-     
-
         for key, value in data.items():
-            if isinstance(value, (dict, list)): continue
+            if isinstance(value, (dict, list)):
+                continue
             
             label = key.replace("_", " ").title().replace("Id", "ID")
             val_str = str(value)
             
-            # if "id" in key.lower() and len(val_str) > 12:
-            #     val_str = f"{val_str[:6]}...{val_str[-4:]}"
-                
             row = f'<div class="prop-row"><span class="key">{label}:</span><div class="title-sub">{val_str}</div></div>'
             body_rows.append(row)
             
-        # Wrap body rows in a specific ID we can target with CSS/JS
         body_html = f'<div id="title-card-body">{"".join(body_rows)}</div>'
         
         return header_html + body_html
 
     def _get_next_color(self) -> str:
+        """
+        Returns the next color from the node color iterator.
+        """
         return next(self.node_colors)
 
     def _process_nodes(self, nodes_trace: List[Dict]) -> List[Dict]:
-        """Transforms raw node traces into Vis.js node format."""
+        """
+        Transforms raw node traces into the format expected by Vis.js.
+        """
         nodes = []
         for node_trace in nodes_trace:
-            # Create a copy to avoid mutating the input data
             nt = node_trace.copy()
             
             node_id = nt['node_name']
@@ -100,7 +107,6 @@ class TraceInspector:
             node_meta = nt.pop('meta', {})
             node_type = node_meta.get('type', 'function_node')
 
-            # Visual defaults
             shape = 'box'
             color = '#97c2fc'
 
@@ -120,13 +126,14 @@ class TraceInspector:
                 "shape": shape,
                 "color": color,
             }
-            # Merge remaining trace data
             node_data.update(nt)
             nodes.append(node_data)
         return nodes
 
     def _process_edges(self, edges_trace: List[Dict]) -> List[Dict]:
-        """Transforms raw edge traces into Vis.js edge format."""
+        """
+        Transforms raw edge traces into the format expected by Vis.js.
+        """
         edges = []
         for edge_trace in edges_trace:
             et = edge_trace.copy()
@@ -152,31 +159,31 @@ class TraceInspector:
 
     def generate_html(self, trace_data: Union[str, Dict]) -> str:
         """
-        Generates the HTML string for the visualization.
+        Generates the HTML content for the visualization.
 
         Args:
-            trace_data: Either a dictionary containing the trace, 
-                        or a string path to a JSON file.
+            trace_data (Union[str, Dict]): Either a dictionary containing the trace
+                                           or a path to a JSON file.
+
         Returns:
             str: The complete HTML content.
         """
-        # Load data if a path is provided
         if isinstance(trace_data, (str, Path)):
             with open(trace_data, 'r', encoding='utf-8') as f:
                 data = json.load(f)
         else:
             data = trace_data
 
-        # Reset color cycle for every new generation ensures consistency
+        # Reset the color cycle for each new generation to ensure consistency.
         self.node_colors = itertools.cycle(DEFAULT_FUNCTION_NODE_COLORS)
 
-        # Process Data
         run_id = data.get('run_id')
         elapsed = format_elapsed_time(data.get('elapsed_time'))
         start_time = format_start_time(data.get('start_time'))
         graph_name = data.get('graph_name', 'Unknown Graph')
         status = data.get('status', 'FAILED')
         nodes = self._process_nodes(data.get('nodes_trace', []))
+        graph_description = data.get('graph_description') if data.get('graph_description') else "No description provided."
         edges = self._process_edges(data.get('edges_trace', []))
         
         title_card_content = self._build_title_card({
@@ -185,8 +192,10 @@ class TraceInspector:
             "Status": status.upper(),
             "Start Time": start_time,
             "Elapsed": elapsed,
+            "Description": graph_description
         })
-        # Inject Data
+        
+        # Inject the processed data into the HTML template.
         final_html = self.html_template.replace(
             "JSON_NODES", json.dumps(nodes, indent=2)
         ).replace(
@@ -197,7 +206,14 @@ class TraceInspector:
         return final_html
 
     def generate_viz(self, trace_data: Union[str, Dict], output_path: str = ""):
-        """Generates HTML and saves it to a file."""
+        """
+        Generates the HTML visualization and saves it to a file.
+
+        Args:
+            trace_data (Union[str, Dict]): Either a dictionary containing the trace
+                                           or a path to a JSON file.
+            output_path (str, optional): The path to save the HTML file.
+        """
         html_content = self.generate_html(trace_data)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)

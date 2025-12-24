@@ -44,22 +44,26 @@ class NodeTrace(BaseModel):
 
 class EdgeTrace(BaseModel):
     """
-    Represents the trace of a single edge's traversal during the graph's execution.
-    It records the flow of control between two nodes, providing insights into the
-    graph's runtime behavior.
+    Represents the trace of a single edge traversal during a graph execution.
+
+    This model captures when and how an edge was traversed, including execution
+    order, timing information, and optional runtime metadata. It provides
+    fine-grained visibility into control flow between nodes.
 
     Attributes:
-        edge_id (str): The unique identifier of the edge.
-        edge_run_number (int): The number of times this edge has been traversed in the
-                               current run.
-        from_node (str): The name of the node where the edge originates.
-        to_node (str): The name of the node where the edge terminates.
-        passes_left (int): The remaining number of times this edge can be traversed
-                           before hitting its `max_passes` limit.
-        edge_type (str): The type of the edge (e.g., '__forward__', '__conditional__').
-        timestamp (float): The timestamp of when the edge was traversed.
-        meta (dict): A dictionary for storing any additional metadata related to the
-                     edge.
+        edge_id (str): Unique identifier of the edge.
+        edge_run_number (int): Sequential number indicating how many times this edge
+            has been traversed during the current run.
+        from_node (str): Name of the source node where the edge originates.
+        to_node (str): Name of the destination node where the edge terminates.
+        passes_left (int): Remaining number of allowed traversals before the edge
+            reaches its maximum pass limit.
+        edge_type (str | None): Type of edge (e.g., "__forward__", "__conditional__").
+        elapsed (float): Elapsed time in seconds since the start of the run when
+            this edge was traversed.
+        state_snapshot (dict): Snapshot of relevant runtime state at the moment
+            the edge was traversed.
+        meta (dict): Additional metadata associated with this edge traversal.
     """
     edge_id: str
     edge_run_number: int
@@ -73,18 +77,25 @@ class EdgeTrace(BaseModel):
 
 class TracesSchema(BaseModel):
     """
-    Defines the schema for storing the complete trace of a graph's execution. It
-    aggregates all the node and edge traces for a single run, providing a
-    comprehensive record of the execution path.
+    Represents the complete execution trace of a graph run.
+
+    This schema aggregates all node and edge traces for a single graph execution,
+    along with execution metadata such as timing and status. It provides a
+    comprehensive, ordered record of how the graph was executed.
 
     Attributes:
-        run_id (str): The unique identifier for the graph execution run.
-        nodes_trace (list[NodeTrace]): A list of all node traces recorded during the
-                                       run.
-        edges_trace (list[EdgeTrace]): A list of all edge traces recorded during the
-                                       run.
+        graph_name (str): The name of the executed graph.
+        graph_description (str): A description of the executed graph.   
+        run_id (str): The unique identifier for this execution run.
+        start_time (float): The Unix timestamp (in seconds) indicating when the
+            execution started.
+        elapsed_time (float): Total execution duration in seconds.
+        status (str): Final execution status (e.g., "SUCCESS", "FAILED").
+        nodes_trace (list[NodeTrace]): Traces for all nodes executed during the run.
+        edges_trace (list[EdgeTrace]): Traces for all edges traversed during the run.
     """
     graph_name : str
+    graph_description: str
     run_id: str
     start_time: float = 0.0
     elapsed_time: float = 0.0
