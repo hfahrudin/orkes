@@ -102,4 +102,5 @@ state: State = {
 
 result= runner.run(state)
 
+runner.visualize_trace()
 # print(agent_graph._nodes_pool)

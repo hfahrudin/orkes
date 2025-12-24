@@ -7,9 +7,10 @@ from typing import Dict, Union, Optional
 from orkes.graph.unit import ForwardEdge, ConditionalEdge
 from orkes.graph.schema import NodePoolItem, TracesSchema, EdgeTrace
 from orkes.graph.unit import _EndNode, _StartNode
+from orkes.visualizer.generator import TraceInspector
 
 class GraphRunner:
-    def __init__(self, graph_name:str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces"):
+    def __init__(self, graph_name:str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces", auto_save_trace: bool = False):
         self.state_def = graph_type
         self.nodes_pool = nodes_pool
         self.graph_state: Dict = {}
@@ -23,6 +24,8 @@ class GraphRunner:
         )
         self.traces_dir = traces_dir
         self.run_number = 0
+        self.auto_save_trace = auto_save_trace
+        self.trace_inspector = TraceInspector()
 
     def save_run_trace(self):
         if not os.path.exists(self.traces_dir):
@@ -30,6 +33,11 @@ class GraphRunner:
         filename = os.path.join(self.traces_dir, f"trace_{self.run_id}.json")
         with open(filename, 'w') as f:
             json.dump(self.trace.model_dump(), f, indent=4)
+
+    def visualize_trace(self):
+        base_name = f"trace_{self.run_id}_inspector.html"
+        out_file = os.path.join(self.traces_dir, base_name)
+        self.trace_inspector.generate_viz(self.trace.model_dump(), out_file)
 
     #TODO: Modifications are returned as a new copy, not in-place mutation.
     def run(self, invoke_state):
@@ -52,8 +60,8 @@ class GraphRunner:
         
         self.trace.elapsed_time = time.time() - self.trace.start_time
         self.trace.status = "FINISHED"
-
-        self.save_run_trace()
+        if self.auto_save_trace:
+            self.save_run_trace()
         return self.graph_state
 
     def traverse_graph(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):

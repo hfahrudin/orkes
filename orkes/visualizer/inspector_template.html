@@ -24,16 +24,11 @@
             transition: height 0.2s ease; /* smooth resize */
         }
 
-        .title-header {
-            padding: 10px 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #343a40; 
-            color: white;
-            border-bottom: 1px solid transparent; /* invisible border usually */
+        .title-header { 
+            padding: 10px 15px; cursor: move; background: #343a40; color: white; 
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none; flex-shrink: 0;
         }
-
         /* When minimized, remove bottom padding/border/etc */
         #title-card.minimized .title-header {
             border-bottom: 0px solid transparent;
@@ -73,12 +68,11 @@
 
         /* Small generic button style (reused from your inspector) */
         .min-btn-title {
-            background: #555; border: none; color: #999; 
-            font-size: 18px; font-weight: bold; cursor: pointer;
-            width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
-            border-radius: 4px;
+            background: #555; border: none; color: white; border-radius: 4px;
+            width: 24px; height: 24px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; font-weight: bold;
         }
-        .min-btn-title:hover { background: #f0f0f0; color: #333; }
+        .min-btn-title:hover { background: #777; }
 
         /* Inspector Base */
         #inspector { 

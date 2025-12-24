@@ -142,7 +142,7 @@ class TraceInspector:
             edge_data = {
                 "from": et.pop('from_node'),
                 "to": et.pop('to_node'),
-                "label": f"Run {et.get('edge_run_number', '')}",
+                "label": f"{et.get('edge_run_number', '')}",
                 "dashes": dashes,
                 "width": 2
             }
@@ -196,7 +196,7 @@ class TraceInspector:
         
         return final_html
 
-    def generate_viz(self, trace_data: Union[str, Dict], output_path: str):
+    def generate_viz(self, trace_data: Union[str, Dict], output_path: str = ""):
         """Generates HTML and saves it to a file."""
         html_content = self.generate_html(trace_data)
         with open(output_path, "w", encoding="utf-8") as f:
