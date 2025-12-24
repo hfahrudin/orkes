@@ -6,3 +6,7 @@ dist/
 orkes.egg-info/
 upload.py
 .env
+legacy/
+.pytest_cache
+tests/reports/
+traces/

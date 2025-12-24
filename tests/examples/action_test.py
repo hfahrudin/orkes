@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from orkes.agents.actions import ActionBuilder
 from orkes.agents.core import ToolAgent
-from orkes.services.connections import vLLMConnection
+from orkes.services.connectors import vLLMConnection
 
 # ------------------ API CALL Function ------------------ #
 def get_ip_info(ip: str):

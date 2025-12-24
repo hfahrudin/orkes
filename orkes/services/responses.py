@@ -4,43 +4,92 @@ from typing import Type
 from requests.models import Response
 
 
-class ResponseInterface:
+class ResponseInterface(ABC):
     """
-    Abstract base class for LLM response.
-    Defines methods to parse messages.
+    An abstract base class for handling LLM responses. It defines the interface
+    for parsing both streaming and full responses from an LLM.
     """
     @abstractmethod
-    def parse_stream_response(self, chunk, **kwargs):
-        """Parse the stream response from the LLM."""
+    def parse_stream_response(self, chunk: bytes, **kwargs) -> str:
+        """
+        Parses a single chunk of a streaming response from the LLM.
+
+        Args:
+            chunk (bytes): A chunk of the response.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            str: The parsed content of the chunk.
+        """
         pass
 
     @abstractmethod
-    def parse_full_response(self, payload):
-        """Parse the full response from the LLM."""
+    def parse_full_response(self, payload: dict) -> dict:
+        """
+        Parses a full, non-streaming response from the LLM.
+
+        Args:
+            payload (dict): The full response payload.
+
+        Returns:
+            dict: The parsed response.
+        """
         pass
 
     @abstractmethod
-    def _generate_event(self, buffer):
-        """Generate SSE event from the given data."""
+    def _generate_event(self, buffer: list) -> str:
+        """
+        Generates a Server-Sent Event (SSE) from the given data.
+
+        Args:
+            buffer (list): A list of strings to be included in the event.
+
+        Returns:
+            str: A formatted SSE string.
+        """
         pass
 
-#Default
 class ChatResponse(ResponseInterface):
-    def __init__(self, end_token = "<|eot_id|>"):
-        #SSE type of response
+    """
+    A response handler for chat-based LLM responses, particularly for streaming
+    responses using Server-Sent Events (SSE).
+
+    Attributes:
+        eot_token (str): The end-of-transmission token to signal the end of a stream.
+    """
+    def __init__(self, end_token: str = "<|eot_id|>"):
+        """
+        Initializes the ChatResponse handler.
+
+        Args:
+            end_token (str, optional): The end-of-transmission token. Defaults to
+                                     "<|eot_id|>".
+        """
         self.eot_token = end_token
 
-    def parse_stream_response(self, chunk: bytes, sse = False):
+    def parse_stream_response(self, chunk: bytes, sse: bool = False) -> str:
+        """
+        Parses a single chunk of a streaming response.
+
+        Args:
+            chunk (bytes): A chunk of the response.
+            sse (bool, optional): Whether to format the output as an SSE event.
+                                Defaults to False.
+
+        Returns:
+            str: The parsed content of the chunk, optionally formatted as an SSE
+                 event.
+        """
         if not chunk:
-            v = ""
+            return ""
 
         chunk_str = chunk.decode('utf-8').strip()
         if not chunk_str or not chunk_str.startswith("data:"):
-            v = ""
+            return ""
 
         data_str = chunk_str[len("data:"):].strip()
         if data_str == "[DONE]":
-            v = "[DONE]"
+            return "[DONE]"
 
         try:
             chunk_data = json.loads(data_str)
@@ -50,34 +99,68 @@ class ChatResponse(ResponseInterface):
         except json.JSONDecodeError:
             v = ""
 
-
         if sse:
-            return self._generate_event(v)
+            return self._generate_event([v])
         else:
             return v
             
-    def _generate_event(self, buffer):
-        event = {}
-        event["v"] = "".join(buffer)
+    def _generate_event(self, buffer: list) -> str:
+        """
+        Generates an SSE event from a buffer of content.
+        """
+        event = {"v": "".join(buffer)}
         return f"event: delta\ndata: {json.dumps(event)}\n\n"
 
-    def parse_full_response(self, payload):
-        #TODO try to parse vllm whole response
+    def parse_full_response(self, payload: dict) -> dict:
+        """
+        Parses a full, non-streaming response.
+        
+        Note:
+            This method is a placeholder and currently returns the payload as is.
+        """
         return payload
 
 
 class StreamResponseBuffer:
-    def __init__(self, llm_response: Type[ResponseInterface], headers=None, eot_token = "<EOT_TOKEN>"):
-        self.headers= headers
+    """
+    A buffer for handling streaming responses from an LLM.
+
+    This class accumulates chunks of a streaming response and yields them as
+    complete events, either when the buffer is full or when the stream ends.
+
+    Attributes:
+        headers: The headers of the response.
+        llm_response (Type[ResponseInterface]): The response handler to use for
+                                               parsing the stream.
+        eot_token (str): The end-of-transmission token.
+    """
+    def __init__(self, llm_response: Type[ResponseInterface], headers=None, eot_token: str = "<EOT_TOKEN>"):
+        """
+        Initializes the StreamResponseBuffer.
+
+        Args:
+            llm_response (Type[ResponseInterface]): The response handler.
+            headers (optional): The response headers. Defaults to None.
+            eot_token (str, optional): The end-of-transmission token. Defaults to
+                                     "<EOT_TOKEN>".
+        """
+        self.headers = headers
         self.llm_response = llm_response
         self.eot_token = eot_token
 
-    async def stream(self, response: Response, buffer_size=10, trigger_connection = None):
-        # Buffer to accumulate chunks until they form a complete sentence or exceed batch_size
+    async def stream(self, response: Response, buffer_size: int = 10, trigger_connection=None):
+        """
+        Streams the response, buffering and yielding events.
+
+        Args:
+            response (Response): The response object to stream.
+            buffer_size (int, optional): The size of the buffer. Defaults to 10.
+            trigger_connection (optional): A connection object to check for
+                                         disconnections. Defaults to None.
+        """
         buffer = []
 
         if response.status_code == 200:
-            # Iterate over the response stream
             for chunk in response.iter_lines():
                 if trigger_connection:
                     if await trigger_connection.is_disconnected():
@@ -92,28 +175,22 @@ class StreamResponseBuffer:
                 if buffer_size > 0:
                     buffer.append(delta_content)
 
-                # Check if the buffer has reached the max length
                 if self._is_buffer_full(buffer, buffer_size):
-                    # Join the buffer into a complete chunk and yield as event
-                    print( self.llm_response._generate_event(buffer))
-                    
-                    # Reset the buffer
+                    yield self.llm_response._generate_event(buffer)
                     buffer.clear()
 
-            # Yield the final event if there's any remaining content in the buffer
             if buffer:
                 yield self.llm_response._generate_event(buffer)
 
         else:
             print(f"Error: {response.status_code}, {response.text}")
-
-
-    # based on character length 
-    # def _is_buffer_full(self, buffer, buffer_size):
-    #     """Check if the buffer has reached the specified max length."""
-    #     return sum(len(word) for word in buffer) + len(buffer) - 1 >= buffer_size
     
-    def _is_buffer_full(self, buffer, buffer_size):
-        """Check if the buffer has reached the specified max length."""
-        #TODO: right now it is based on the number of chunks, it could be based on other advanced metrics
-        return  len(buffer) >= buffer_size
+    def _is_buffer_full(self, buffer: list, buffer_size: int) -> bool:
+        """
+        Checks if the buffer has reached the specified size.
+
+        Note:
+            Currently, this is based on the number of chunks, but it could be
+            based on other metrics in the future.
+        """
+        return len(buffer) >= buffer_size

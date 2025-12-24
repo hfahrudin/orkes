@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 from orkes.agents.core import Agent
-from orkes.services.connections import vLLMConnection
+from orkes.services.connectors import vLLMConnection
 from orkes.services.prompts import ChatPromptHandler
 from orkes.services.responses import ChatResponse
 

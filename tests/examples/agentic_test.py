@@ -9,7 +9,7 @@ from orkes.graph.core import OrkesGraph
 from typing import TypedDict
 from orkes.agents.core import Agent, ToolAgent
 from orkes.agents.actions import ActionBuilder
-from orkes.services.connections import vLLMConnection
+from orkes.services.connectors import vLLMConnection
 from orkes.services.prompts import ChatPromptHandler
 from orkes.services.responses import ChatResponse
 import json
