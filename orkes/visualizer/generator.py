@@ -144,7 +144,7 @@ class TraceInspector:
                 "to": et.pop('to_node'),
                 "label": f"{et.get('edge_run_number', '')}",
                 "dashes": dashes,
-                "width": 2
+                "width": 0.5
             }
             edge_data.update(et)
             edges.append(edge_data)
