@@ -8,4 +8,6 @@ build:
 
 python:
   install:
-    - requirements: requirement.txt
+    - method: pip
+      path: .
+    - requirements: requirements.txt
