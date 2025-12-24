@@ -1,6 +1,9 @@
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 import datetime
+import ast
+import inspect
+import sys
 
 def format_start_time(start_time: float) -> str:
     """
@@ -96,3 +99,45 @@ class ToolDefinition(BaseModel):
             "description": self.description,
             "input_schema": self.parameters.model_dump()
         }
+
+
+def get_instances_from_func(func, state, target_class):
+    instances = []
+
+    def tracer(frame, event, arg):
+        # We look at the 'return' event to see all locals before they are destroyed
+        if event == 'return':
+            for var_name, value in frame.f_locals.items():
+                if isinstance(value, target_class):
+                    instances.append(value)
+        return tracer
+
+    # Set the trace and run the function
+    sys.settrace(tracer)
+    try:
+        func(state)
+    finally:
+        sys.settrace(None) # Always stop tracing to prevent slowdowns
+    
+    return instances
+
+
+def create_dict_from_typeddict(td_cls):
+    # Mapping of types to their "zero-value" defaults
+    type_defaults = {
+        str: "",
+        int: 0,
+        bool: False,
+        list: [],
+        List: [],  # Handles typing.List
+        dict: {}
+    }
+    
+    # Extract annotations (keys and their types)
+    # Using __annotations__ works even if typing.get_type_hints fails
+    annotations = td_cls.__annotations__
+    
+    return {
+        key: type_defaults.get(val_type, None) 
+        for key, val_type in annotations.items()
+    }
