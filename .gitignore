@@ -10,3 +10,7 @@ legacy/
 .pytest_cache
 tests/reports/
 traces/
+docs/_build/
+docs/build/
+docs/source/api/
+.DS_STORE
