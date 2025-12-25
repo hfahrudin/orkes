@@ -1,5 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union, List, Dict, Any
+from orkes.shared.schema import OrkesMessagesSchema
+from orkes.services.schema import RequestSchema
 
 if TYPE_CHECKING:
     from orkes.graph.unit import Node, Edge
@@ -75,6 +77,25 @@ class EdgeTrace(BaseModel):
     state_snapshot: dict = {}
     meta: dict
 
+class LLMTraceSchema(BaseModel):
+    """
+    Represents the input and output of an LLM interaction for tracking purposes.
+
+    Attributes:
+        messages (OrkesMessagesSchema): The messages sent to the LLM.
+        tools (Optional[List[Dict]]): The tools provided to the LLM.
+        parsed_response (RequestSchema): The parsed response from the LLM.
+        edge_id (Optional[str]): The ID of the graph edge that triggered this interaction.
+        model (str): The name of the model used.
+        timestamp (datetime): The timestamp of the interaction.
+        settings (Optional[Dict]): Any additional settings used for the request.
+    """
+    messages: OrkesMessagesSchema
+    tools: Optional[List[Dict]] = None
+    parsed_response: RequestSchema
+    model: str
+    settings: Optional[Dict] = None
+
 class TracesSchema(BaseModel):
     """
     Represents the complete execution trace of a graph run.
@@ -93,6 +114,7 @@ class TracesSchema(BaseModel):
         status (str): Final execution status (e.g., "SUCCESS", "FAILED").
         nodes_trace (list[NodeTrace]): Traces for all nodes executed during the run.
         edges_trace (list[EdgeTrace]): Traces for all edges traversed during the run.
+        llm_traces (List[LLMTraceSchema]): Traces for all LLM calls made during the run.
     """
     graph_name : str
     graph_description: str
@@ -102,3 +124,4 @@ class TracesSchema(BaseModel):
     status: str = "FAILED"
     nodes_trace: list[NodeTrace]
     edges_trace: list[EdgeTrace]
+    llm_traces: List[LLMTraceSchema] = []
