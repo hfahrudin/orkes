@@ -53,3 +53,50 @@ class OrkesMessagesSchema(BaseModel):
         messages (List[OrkesMessageSchema]): A list of messages.
     """
     messages: List[OrkesMessageSchema]
+
+
+
+class ToolDefinition(BaseModel):
+    """
+    A universal schema for defining a tool that can be used by an LLM, with methods
+    to convert the tool definition to different provider-specific formats.
+
+    Attributes:
+        name (str): The name of the tool.
+        description (str): A description of what the tool does.
+        parameters (ToolParameter): The schema for the parameters that the tool
+                                   accepts.
+    """
+    name: str
+    description: str
+    parameters: ToolParameter
+
+    def to_openai(self) -> Dict[str, Any]:
+        """
+        Converts the tool definition to the format expected by OpenAI and vLLM.
+        """
+        return {
+            "type": "function",
+            "function": self.model_dump()
+        }
+
+    def to_gemini(self) -> Dict[str, Any]:
+        """
+        Converts the tool definition to the format expected by Google Gemini.
+        """
+        dump = self.model_dump()
+        return {
+            "name": dump["name"],
+            "description": dump["description"],
+            "parameters": dump["parameters"]
+        }
+
+    def to_claude(self) -> Dict[str, Any]:
+        """
+        Converts the tool definition to the format expected by Anthropic Claude.
+        """
+        return {
+            "name": self.name,
+            "description": self.description,
+            "input_schema": self.parameters.model_dump()
+        }

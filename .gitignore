@@ -13,5 +13,5 @@ traces/
 !tests/legacy/
 docs/_build/
 docs/build/
-docs/source/api/
+docs/source/api
 .DS_STORE
