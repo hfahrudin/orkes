@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 from pydantic import BaseModel
 
 class ToolParameter(BaseModel):
@@ -28,22 +28,36 @@ class OrkesToolSchema(BaseModel):
         description (str): A description of what the tool does.
         parameters (ToolParameter): The schema for the parameters that the tool
                                    accepts.
+        function (Callable): The actual callable function for the tool.
     """
     name: str
     description: str
     parameters: ToolParameter
+    function: Callable
+
+    model_config = {
+        "arbitrary_types_allowed": True
+    }
 
 class OrkesMessageSchema(BaseModel):
     """
     Represents a single message in a conversation with an LLM.
 
     Attributes:
-        role (str): The role of the message's author, such as 'user', 'system', or
-                    'assistant'.
-        content (str): The content of the message.
+        role (str): The role of the message's author, such as 'user', 'system', 
+                    'assistant', or 'tool'.
+        content (Union[str, List[Dict], None]): The content of the message. Can be a string,
+                                     a list of dictionaries (for tool calls),
+                                     or None.
+        content_type (Optional[str]): The type of content, e.g., 'tool_calls'.
+        tool_call_id (Optional[str]): The ID of the tool call, used for messages with
+                                   the 'tool' role.
     """
     role: str
-    content: str
+    content: Union[str, List[Dict], None]
+    content_type: Optional[str] = None
+    tool_call_id: Optional[str] = None
+
 
 class OrkesMessagesSchema(BaseModel):
     """
