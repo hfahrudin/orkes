@@ -33,6 +33,10 @@ html_theme_options = {
     "navbar_align": "left",
     "github_url": "https://github.com/hfahrudin/orkes",
     "footer_start": ["orkes_footer", "sphinx-version"],
+    "secondary_sidebar_items": {
+        "**": ["page-toc"],
+        "index": ["page-toc"],
+    }
 
 }
 
