@@ -121,6 +121,50 @@
         .card { border-radius: 8px; padding: 10px; margin-bottom: 10px; border: 1px solid #e1e4e8; }
         .node-card { border-left: 5px solid #007bff; background: #f1f8ff; }
         .edge-card { border-left: 5px solid #6c757d; background: #f8f9fa; }
+
+        /* LLM Trace Card Style */
+        .llm-trace-card {
+            background: #e9ecef;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        /* LLM Model Name Style */
+        .llm-model-name {
+            font-weight: bold;
+            color: #007bff; /* A nice blue, contrasting but not jarring */
+        }
+        /* Styles for inner LLM trace fields */
+        .llm-trace-inner-row {
+            margin-left: 15px; /* Indent inner fields */
+        }
+        .llm-trace-inner-key {
+            color: #6c757d; /* Muted color */
+            text-transform: none; /* No uppercase */
+        }
+        .llm-trace-inner-key.collapsible:before {
+            font-size: 1em;
+        }
+        /* Collapsible Section Styles */
+        .key.collapsible {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .key.collapsible:before {
+            content: '\002B'; /* Plus sign */
+            font-size: 1.2em;
+            color: #888;
+            margin-right: 8px; /* Space between icon and text */
+        }
+        .key.collapsible.active:before {
+            content: "\2212"; /* Minus sign */
+        }
+        .value.collapsible-content {
+            display: none;
+            padding-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -174,6 +218,16 @@
             isMinimized = !isMinimized;
         }
 
+        function toggleCollapse(header) {
+            header.classList.toggle("active");
+            const content = header.nextElementSibling;
+            if (content.style.display === "block") {
+                content.style.display = "none";
+            } else {
+                content.style.display = "block";
+            }
+        }
+
         // Toggle Title Card Minimize
         function toggleTitleCard() {
             const card = document.getElementById('title-card');
@@ -205,12 +259,60 @@
             }
 
             if (targetData) {
+                const singleLevelCollapsible = ['state_snapshot'];
+
+                html += '<div>'; // Wrapper for all prop-rows
+
                 for (let key in targetData) {
                     if (['id', 'from', 'to', 'shape', 'color', 'label', 'x', 'y', 'dashes', 'width', 'node_name'].includes(key)) continue;
+                    
                     let val = targetData[key];
-                    let display = (typeof val === 'object') ? `<pre class="json-box">${JSON.stringify(val, null, 2)}</pre>` : val;
-                    html += `<div class="prop-row"><span class="key">${key}:</span><div class="value">${display}</div></div>`;
+                    html += '<div class="prop-row">';
+
+                    if (key === 'llm_traces') {
+                        if (Array.isArray(val) && val.length > 0) {
+                            html += `<div class="key collapsible" onclick="toggleCollapse(this)">${key}</div>`;
+                            html += `<div class="value collapsible-content">`;
+
+                            val.forEach((trace, index) => {
+                                html += `<div class="llm-trace-card">`;
+                                html += '<div class="prop-row">';
+                                html += `<div class="key collapsible" onclick="toggleCollapse(this)">LLM Trace ${index + 1}</div>`;
+                                html += `<div class="value collapsible-content">`;
+
+                                for (let traceKey in trace) {
+                                    html += `<div class="prop-row llm-trace-inner-row">`; // Apply inner row style
+                                    
+                                    // All inner LLM trace fields are collapsible
+                                    html += `<div class="key collapsible llm-trace-inner-key" onclick="toggleCollapse(this)">${traceKey}</div>`;
+                                    html += `<div class="value collapsible-content">`;
+                                    let displayValue = JSON.stringify(trace[traceKey], null, 2);
+                                    if (traceKey === 'model') {
+                                        html += `<pre class="json-box llm-model-name">${displayValue}</pre>`;
+                                    } else {
+                                        html += `<pre class="json-box">${displayValue}</pre>`;
+                                    }
+                                    html += `</div></div>`;
+                                }
+                                html += `</div></div></div>`;
+                            });
+
+                            html += `</div>`;
+                        } else {
+                            html += `<span class="key">${key}:</span><div class="value">No LLM Traced</div>`;
+                        }
+                    } else if (singleLevelCollapsible.includes(key) && typeof val === 'object' && val !== null && (!Array.isArray(val) || val.length > 0)) {
+                        html += `<div class="key collapsible" onclick="toggleCollapse(this)">${key}</div>`;
+                        html += `<div class="value collapsible-content">`;
+                        html += `<pre class="json-box">${JSON.stringify(val, null, 2)}</pre>`;
+                        html += `</div>`;
+                    } else {
+                        let display = (typeof val === 'object' && val !== null) ? `<pre class="json-box">${JSON.stringify(val, null, 2)}</pre>` : val;
+                        html += `<span class="key">${key}:</span><div class="value">${display}</div>`;
+                    }
+                    html += '</div>';
                 }
+                html += '</div>'; // close wrapper
                 document.getElementById('content').innerHTML = html + '</div>';
             }
         });

@@ -5,6 +5,8 @@ import aiohttp
 from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
 from orkes.services.schema import LLMInterface
 from orkes.shared.schema import OrkesMessagesSchema
+from orkes.shared.context import edge_trace_var
+from orkes.graph.schema import LLMTraceSchema
 
 class LLMConfig:
     """
@@ -169,24 +171,38 @@ class UniversalLLMClient(LLMInterface):
 
         full_url = f"{self.config.base_url}{endpoint}"
 
+        settings=self._merge_settings(kwargs)
         payload = self.provider.prepare_payload(
             self.config.model, 
             messages, 
             stream=False, 
-            settings=self._merge_settings(kwargs),
+            settings=settings,
             tools=tools
         )
         
         params = {}
+        edge_trace = edge_trace_var.get()
 
         try:
             response = requests.post(full_url, headers=self.session_headers, json=payload, params=params)
             response.raise_for_status()
             data = response.json()
+            parsed_response = self.provider.parse_response(data)
+
+            if edge_trace:
+                llm_trace = LLMTraceSchema(
+                    messages=messages,
+                    tools=tools,
+                    parsed_response=parsed_response,
+                    model=self.config.model,
+                    settings=settings
+                )
+                edge_trace.llm_traces.append(llm_trace)
+
             # Return raw data + parsed content for convenience
             return {
                 "raw": data,
-                "content": self.provider.parse_response(data).model_dump()
+                "content": parsed_response.model_dump()
             }
         except requests.RequestException as e:
             # Re-raise the exception to be handled by the caller.

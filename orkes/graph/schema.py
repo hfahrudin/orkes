@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, TYPE_CHECKING, Union, List, Dict, Any
 from orkes.shared.schema import OrkesMessagesSchema
 from orkes.services.schema import RequestSchema
+from datetime import datetime
 
 if TYPE_CHECKING:
     from orkes.graph.unit import Node, Edge
@@ -66,6 +67,8 @@ class EdgeTrace(BaseModel):
         state_snapshot (dict): Snapshot of relevant runtime state at the moment
             the edge was traversed.
         meta (dict): Additional metadata associated with this edge traversal.
+        llm_traces (list[LLMTraceSchema]): A list of LLM traces that occurred
+                                           during this edge's execution.
     """
     edge_id: str
     edge_run_number: int
@@ -76,6 +79,7 @@ class EdgeTrace(BaseModel):
     elapsed: float
     state_snapshot: dict = {}
     meta: dict
+    llm_traces: List["LLMTraceSchema"] = []
 
 class LLMTraceSchema(BaseModel):
     """
@@ -87,7 +91,6 @@ class LLMTraceSchema(BaseModel):
         parsed_response (RequestSchema): The parsed response from the LLM.
         edge_id (Optional[str]): The ID of the graph edge that triggered this interaction.
         model (str): The name of the model used.
-        timestamp (datetime): The timestamp of the interaction.
         settings (Optional[Dict]): Any additional settings used for the request.
     """
     messages: OrkesMessagesSchema
@@ -114,7 +117,6 @@ class TracesSchema(BaseModel):
         status (str): Final execution status (e.g., "SUCCESS", "FAILED").
         nodes_trace (list[NodeTrace]): Traces for all nodes executed during the run.
         edges_trace (list[EdgeTrace]): Traces for all edges traversed during the run.
-        llm_traces (List[LLMTraceSchema]): Traces for all LLM calls made during the run.
     """
     graph_name : str
     graph_description: str
@@ -124,4 +126,3 @@ class TracesSchema(BaseModel):
     status: str = "FAILED"
     nodes_trace: list[NodeTrace]
     edges_trace: list[EdgeTrace]
-    llm_traces: List[LLMTraceSchema] = []

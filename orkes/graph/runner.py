@@ -8,6 +8,8 @@ from orkes.graph.unit import ForwardEdge, ConditionalEdge
 from orkes.graph.schema import NodePoolItem, TracesSchema, EdgeTrace
 from orkes.graph.unit import _EndNode, _StartNode
 from orkes.visualizer.generator import TraceInspector
+from orkes.shared.context import trace_var, edge_id_var, edge_trace_var
+from datetime import datetime
 
 class GraphRunner:
     """
@@ -30,6 +32,7 @@ class GraphRunner:
         auto_save_trace (bool): If True, the trace is automatically saved after execution.
         trace_inspector (TraceInspector): An object to generate a visualization of the trace.
     """
+
     def __init__(self, graph_name:str, graph_description:str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces", auto_save_trace: bool = False):
         """
         Initializes the GraphRunner.
@@ -104,7 +107,11 @@ class GraphRunner:
         
         self.trace.start_time = time.time()
 
-        self.traverse_graph(start_edges, input_state)
+        token = trace_var.set(self.trace)
+        try:
+            self.traverse_graph(start_edges, input_state)
+        finally:
+            trace_var.reset(token)
         
         self.trace.elapsed_time = time.time() - self.trace.start_time
         self.trace.status = "FINISHED"
@@ -120,60 +127,69 @@ class GraphRunner:
             current_edge (Union[ForwardEdge, ConditionalEdge]): The edge to traverse.
             input_state (Dict): The current state of the graph.
         """
-        # Prevent infinite loops by checking the number of passes.
-        if current_edge.passes > current_edge.max_passes:
-            raise RuntimeError(
-                f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
-                "exceeding the allowed maximum without reaching a stop condition."
-            )
-        else:
-            current_edge.passes+=1
-            self.run_number += 1
 
-        # Trace the edge traversal.
-        edge_trace = current_edge.edge_trace.model_copy()
-        edge_trace.edge_run_number = self.run_number 
-        edge_trace.passes_left = current_edge.max_passes - current_edge.passes
-        start = time.time()
-        edge_trace.state_snapshot = input_state.copy()
+        edge_token = edge_id_var.set(current_edge.id)
+        try:
+            # Prevent infinite loops by checking the number of passes.
+            if current_edge.passes > current_edge.max_passes:
+                raise RuntimeError(
+                    f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
+                    "exceeding the allowed maximum without reaching a stop condition."
+                )
+            else:
+                current_edge.passes+=1
+                self.run_number += 1
+
+            # Trace the edge traversal.
+            edge_trace = current_edge.edge_trace.model_copy()
+            edge_trace.edge_run_number = self.run_number 
+            edge_trace.passes_left = current_edge.max_passes - current_edge.passes
+            start = time.time()
+            edge_trace.state_snapshot = input_state.copy()
 
 
-        current_node = current_edge.from_node.node
-        
-        if current_edge.edge_type == "__forward__":
-            # Execute the node if it's not the start node.
-            if not isinstance(current_node, _StartNode):
-                result =  current_node.execute(input_state)
-                self.graph_state.update(result)
+            current_node = current_edge.from_node.node
             
-            # Get the next edge and node.
-            next_edge = current_edge.to_node.edge
-            next_node = current_edge.to_node.node
+            edge_trace_token = edge_trace_var.set(edge_trace)
+            try:
+                if current_edge.edge_type == "__forward__":
+                    # Execute the node if it's not the start node.
+                    if not isinstance(current_node, _StartNode):
+                        result =  current_node.execute(input_state)
+                        self.graph_state.update(result)
+                    
+                    # Get the next edge and node.
+                    next_edge = current_edge.to_node.edge
+                    next_node = current_edge.to_node.node
 
 
-        elif current_edge.edge_type == "__conditional__":
-            # Execute the node.
-            result =  current_node.execute(input_state)
-            self.graph_state.update(result)
+                elif current_edge.edge_type == "__conditional__":
+                    # Execute the node.
+                    result =  current_node.execute(input_state)
+                    self.graph_state.update(result)
 
-            # Determine the next node based on the gate function's result.
-            gate_function = current_edge.gate_function
-            condition = current_edge.condition
-            result_gate = gate_function(self.graph_state)
+                    # Determine the next node based on the gate function's result.
+                    gate_function = current_edge.gate_function
+                    condition = current_edge.condition
+                    result_gate = gate_function(self.graph_state)
 
-            next_node_name = condition[result_gate]
+                    next_node_name = condition[result_gate]
+                    
+                    next_node = self.nodes_pool[next_node_name].node
+                    next_edge = self.nodes_pool[next_node_name].edge
+                    edge_trace.to_node = next_node_name
+            finally:
+                edge_trace_var.reset(edge_trace_token)
+                
+            edge_trace.elapsed = time.time() - start
+            self.trace.edges_trace.append(edge_trace)
             
-            next_node = self.nodes_pool[next_node_name].node
-            next_edge = self.nodes_pool[next_node_name].edge
-            edge_trace.to_node = next_node_name
-            
-        edge_trace.elapsed = time.time() - start
-        self.trace.edges_trace.append(edge_trace)
-        
-        # Continue traversal if the next node is not the end node.
-        if not isinstance(next_node, _EndNode):
-            next_input = self.graph_state.copy()
-            self.traverse_graph( next_edge, next_input)
+            # Continue traversal if the next node is not the end node.
+            if not isinstance(next_node, _EndNode):
+                next_input = self.graph_state.copy()
+                self.traverse_graph( next_edge, next_input)
+        finally:
+            edge_id_var.reset(edge_token)
 
 # Handle Brancing and merging state -> because state update only happen after node process done, no shared mutable object
 # FAN IN FAN OUT STRATEGY, EVERY BRANCHING NODE NEED TO BE RETURNED
