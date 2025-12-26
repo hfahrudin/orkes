@@ -299,7 +299,12 @@
 
                             html += `</div>`;
                         } else {
-                            html += `<span class="key">${key}:</span><div class="value">No LLM Traced</div>`;
+                            // Collapsible header for the empty state
+                            html += `<div class="key collapsible" onclick="toggleCollapse(this)">${key}</div>`;
+                            // Content that shows up when expanded
+                            html += `<div class="value collapsible-content">`;
+                            html += `<div class="llm-trace-card" style="padding: 10px; color: #888; font-style: italic;">No LLM Traced</div>`;
+                            html += `</div>`;
                         }
                     } else if (singleLevelCollapsible.includes(key) && typeof val === 'object' && val !== null && (!Array.isArray(val) || val.length > 0)) {
                         html += `<div class="key collapsible" onclick="toggleCollapse(this)">${key}</div>`;

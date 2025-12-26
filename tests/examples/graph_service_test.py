@@ -70,6 +70,10 @@ def synthesis_node(state: SearchState):
     messages = OrkesMessagesSchema(messages=[{"role": "user", "content": prompt}])
     response = llm_client.send_message(messages)
     
+    #TESTING DOUBLE TRACE
+    messages2 = OrkesMessagesSchema(messages=[{"role": "user", "content": prompt}])
+    _ = llm_client.send_message(messages2)
+
     state['final_answer'] = response.get('raw', {}).get('choices', [{}])[0].get('message', {}).get('content')
     print(f"\n✨ Final Answer:\n{state['final_answer']}")
     return state

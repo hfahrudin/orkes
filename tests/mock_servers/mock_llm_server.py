@@ -93,12 +93,17 @@ async def create_chat_completion(request: ChatCompletionRequest):
             "usage": {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21},
         }
     else:
+        await asyncio.sleep(0.1) # Simulate network delay
+        user_message = ""
+        if request.messages:
+            user_message = request.messages[-1].get("content", "")
+
         return {
             "id": "chatcmpl-123",
             "object": "chat.completion",
             "created": 1677652288,
             "model": request.model,
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hello from OpenAI/vLLM, how can I help you today?"}, "finish_reason": "stop"}],
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": f"Mock server received: {user_message}"}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21},
         }
 

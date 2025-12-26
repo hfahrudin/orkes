@@ -20,12 +20,6 @@ The frustrating part: today’s higher level libraries are abstractions on top o
 
 Hence the pain of using high-level abstraction frameworks, some niche cases just don’t get covered.
 
-## 📚 Documentation
-
-* [orkes.agents](orkes/agents/docs.md) – Documentation for agent classes, interfaces, and tool integration.
-* [orkes.graph](orkes/graph/docs.md) – Guides for building, compiling, and running DCG-based workflows with OrkesGraph.
-* [orkes.services](orkes/services/docs.md) – Details on LLM connections, prompt handling, and response parsing services.
-
 ## 🔹 Core Principles
 
 * **Explicit control flow** — use DCGs, FSMs, or plain loops
@@ -50,16 +44,13 @@ To run all integration and example tests, use the provided script:
 python tests/run_all_tests.py
 ```
 
-## 🛠️ Project Status
+## 🛠️ WHATS NEXT?
 
 This is the initial stage of Orkes.
 
-* [x] Vision and core philosophy
-* [x] Elementary Directed Cyclic Graph orchestration engine
-* [x] Controllable Agent structure (prompt + tool + fn)
-* [x] **LLM connection abstractions (OpenAI/vLLM, Gemini, Claude) with synchronous and asynchronous streaming support**
-* [x] Minimal examples
-* [x] Documentations
+* [x] Tracer Dashboard 
+* [x] Remote Tracer Dashboard
+* [x] Paralel Node
 
 ## License
 
