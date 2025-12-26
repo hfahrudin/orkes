@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, Union
 from pydantic import BaseModel
 
 class ToolParameter(BaseModel):
@@ -33,7 +33,7 @@ class OrkesToolSchema(BaseModel):
     name: str
     description: str
     parameters: ToolParameter
-    function: Callable
+    function: Optional[Callable] = None
 
     model_config = {
         "arbitrary_types_allowed": True

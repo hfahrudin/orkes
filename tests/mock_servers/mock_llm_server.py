@@ -103,7 +103,7 @@ async def create_chat_completion(request: ChatCompletionRequest):
             "object": "chat.completion",
             "created": 1677652288,
             "model": request.model,
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": f"Mock server received: {user_message}"}, "finish_reason": "stop"}],
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hello from OpenAI/vLLM, how can I help you today?"}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21},
         }
 

@@ -3,6 +3,7 @@ from orkes.graph.core import OrkesGraph
 from orkes.services.schema import LLMInterface
 from orkes.shared.schema import OrkesToolSchema, OrkesMessagesSchema, OrkesMessageSchema
 from orkes.agents.schema import Agent
+import asyncio
 
 class ReactAgentState(TypedDict):
     """
@@ -20,9 +21,10 @@ class ReactAgent(Agent):
     """
     A ReAct (Reasoning and Acting) agent that uses an OrkesGraph to orchestrate its execution.
     """
-    def __init__(self, llm: LLMInterface, tools: List[OrkesToolSchema], name: str = "ReactAgent"):
+    def __init__(self, llm: LLMInterface, tools: List[OrkesToolSchema], name: str = "ReactAgent", trace_mode: str = "none"):
         super().__init__(name, llm)
         self.tools = {tool.name: tool for tool in tools}
+        self.trace_mode = trace_mode
         self.graph = self._build_graph()
 
     def _build_graph(self) -> OrkesGraph:
@@ -38,12 +40,14 @@ class ReactAgent(Agent):
         
         graph.add_conditional_edge("reason_and_act", self._decide_next_step, {
             "tool_call": "execute_tool",
-            "finish": graph.END,
+            "finish": "END",
         })
         
         graph.add_edge("execute_tool", "reason_and_act")
 
-        return graph.compile()
+        app = graph.compile()
+        app.auto_save_trace = (self.trace_mode == "all") # Set auto_save_trace based on trace_mode
+        return app
 
     def invoke(self, query: str, max_iterations: int = 5) -> str:
         """
@@ -59,6 +63,26 @@ class ReactAgent(Agent):
         }
         
         final_state = self.graph.run(initial_state)
+
+        if self.trace_mode == "all":
+            self.graph.visualize_trace()
+        
+        return final_state.get('final_answer', "No answer found.")
+
+    async def ainvoke(self, query: str, max_iterations: int = 5) -> str:
+        """
+        Asynchronously invokes the agent with a query.
+        """
+        initial_state = {
+            "query": query,
+            "messages": OrkesMessagesSchema(messages=[OrkesMessageSchema(role="user", content=query)]),
+            "max_iterations": max_iterations,
+            "current_iteration": 0,
+            "final_answer": None,
+            "tool_calls": None
+        }
+        
+        final_state = await asyncio.to_thread(self.graph.run, initial_state)
         
         return final_state.get('final_answer', "No answer found.")
 

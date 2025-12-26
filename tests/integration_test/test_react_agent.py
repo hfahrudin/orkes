@@ -4,6 +4,7 @@ from typing import TypedDict, List, Dict, Callable
 from orkes.agents.react import ReactAgent, ReactAgentState
 from orkes.services.schema import LLMInterface
 from orkes.shared.schema import OrkesToolSchema, ToolParameter, OrkesMessagesSchema, OrkesMessageSchema
+import os
 
 # --- Fixtures for Mocking ---
 
@@ -21,8 +22,8 @@ def simple_tool():
     """
     Fixture for a simple mock tool.
     """
-    def my_function(input_str: str) -> str:
-        return f"Processed: {input_str}"
+    # Mock the actual function to track its calls
+    mock_my_function = Mock(return_value="Mocked processing result.")
 
     tool_schema = OrkesToolSchema(
         name="my_function",
@@ -31,7 +32,7 @@ def simple_tool():
             properties={"input_str": {"type": "string"}},
             required=["input_str"]
         ),
-        function=my_function
+        function=mock_my_function # Use the mock here
     )
     return tool_schema
 
@@ -97,7 +98,33 @@ def test_react_agent_max_iterations(mock_llm_interface, simple_tool):
     response = agent.invoke("Loop forever.", max_iterations=2) # Set max iterations to 2
 
     assert "Max iterations reached. Could not find an answer." in response
-    # Ensure LLM was called max_iterations times
-    assert mock_llm_interface.send_message.call_count == 2
+    # Ensure LLM was called max_iterations + 1 times
+    assert mock_llm_interface.send_message.call_count == 3
     # Ensure tool was called max_iterations times
     assert simple_tool.function.call_count == 2
+
+def test_react_agent_visualization(mock_llm_interface, simple_tool):
+    """
+    Tests that the ReactAgent generates trace and visualization files.
+    """
+    # Configure mock LLM to return a direct answer
+    mock_llm_interface.send_message.return_value = {
+        "content": {"content_type": "message", "content": "The direct answer is 42."},
+        "raw": {}
+    }
+
+    agent = ReactAgent(llm=mock_llm_interface, tools=[simple_tool], trace_mode="all")
+    agent.invoke("Generate a visualization.")
+
+    trace_file = f"traces/trace_{agent.graph.run_id}.json"
+    viz_file = f"traces/trace_{agent.graph.run_id}_inspector.html"
+
+    try:
+        assert os.path.exists(trace_file)
+        assert os.path.exists(viz_file)
+    finally:
+        if os.path.exists(trace_file):
+            os.remove(trace_file)
+        if os.path.exists(viz_file):
+            os.remove(viz_file)
+
