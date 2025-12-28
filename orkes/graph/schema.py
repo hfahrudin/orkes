@@ -119,8 +119,9 @@ class EdgeTrace(BaseModel):
     elapsed: float
     state_snapshot: dict = {}
     meta: dict
-    llm_traces: List[LLMTraceSchema] = []
     function_traces: List[FunctionTraceSchema] = []
+    llm_traces: List[LLMTraceSchema] = []
+
 
 class TracesSchema(BaseModel):
     """
