@@ -89,3 +89,27 @@ def test_graph_visualization():
 
     # 10. Clean up the generated file
     os.remove(trace_file)
+
+def test_graph_runner_without_tracing():
+    """
+    Tests that the graph runner does not produce a trace when traced=False.
+    """
+    # 1. Create a graph with tracing disabled
+    workflow = OrkesGraph(state=GraphState, name="test_graph_no_trace", traced=False)
+
+    # 2. Add nodes
+    workflow.add_node("A", node_a)
+    workflow.add_edge(workflow.START, "A")
+    workflow.add_edge("A", workflow.END)
+
+    # 3. Compile and run
+    app = workflow.compile()
+    initial_state = {"input": "start", "output": "", "path": ""}
+    final_state = app.run(initial_state)
+
+    # 4. Assertions
+    trace_file = f"traces/trace_{app.run_id}_inspector.html"
+    assert not os.path.exists(trace_file), "Trace file should not be created"
+    assert app.trace is None, "app.trace should be None"
+    assert "start -> A" == final_state.get("output")
+

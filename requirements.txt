@@ -4,3 +4,4 @@ uvicorn
 python-dotenv
 pytest
 pytest-html
+memory-profiler
