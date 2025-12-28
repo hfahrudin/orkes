@@ -48,6 +48,16 @@ def run_all_tests():
         
         result = subprocess.run(cmd)
 
+        if os.path.exists(report_path):
+            with open(report_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Remove the problematic line
+            content = content.replace("window.history.pushState({}, null, unescape(url.href))", "")
+
+            with open(report_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
         if result.returncode != 0:
             print(f"Tests in {folder} FAILED.")
             overall_success = False
