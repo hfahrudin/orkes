@@ -8,11 +8,12 @@ from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema
 
 from dotenv import load_dotenv
 
+import sys
 @pytest.fixture(scope="module")
 def mock_server():
     # Start the mock server in a separate process
     mock_server_path = os.path.join(os.path.dirname(__file__), '..', 'mock_servers', 'mock_llm_server.py')
-    server_process = subprocess.Popen(['python', mock_server_path])
+    server_process = subprocess.Popen([sys.executable, mock_server_path])
 
     # Give the server a moment to start
     time.sleep(5)
