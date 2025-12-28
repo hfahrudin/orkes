@@ -1,6 +1,7 @@
 from orkes.graph.core import OrkesGraph
 from orkes.services.connectors import LLMFactory
 from orkes.shared.schema import OrkesMessagesSchema
+from orkes.graph.utils import orkes_tracable
 from typing import TypedDict, List
 import json
 from dotenv import load_dotenv
@@ -19,6 +20,11 @@ class SearchState(TypedDict):
     raw_results: List[str]
     is_finished: bool
     final_answer: str
+
+@orkes_tracable
+def streamline_plan(clean_content):
+    plan = json.loads(clean_content)
+    return plan
 # --- Node 1: LLM Planner ---
 def planner_node(state: SearchState):
     """LLM looks at the user query and generates a list of 3 search queries."""
@@ -38,7 +44,7 @@ def planner_node(state: SearchState):
     try:
         # Removing potential markdown code blocks if the LLM adds them
         clean_content = content.replace("```json", "").replace("```", "").strip()
-        state['search_queries'] = json.loads(clean_content)
+        state['search_queries'] = streamline_plan(clean_content)
     except Exception as e:
         print(f"Error parsing LLM response: {e}")
         state['search_queries'] = [state['user_query']] # Fallback to original query

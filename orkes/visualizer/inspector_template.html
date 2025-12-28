@@ -109,14 +109,14 @@
         
         /* Text Display Fixes */
         .prop-row { margin-bottom: 8px; display: flex; flex-direction: column; }
-        .key { font-weight: 700; color: #555; font-size: 0.85em; text-transform: uppercase; margin-bottom: 2px; }
+        .key { font-weight: 700; color: #555; font-size: 0.95em; text-transform: uppercase; margin-bottom: 2px; }
         .value { 
             color: #222; font-size: 0.95em; word-wrap: break-word; 
             overflow-wrap: break-word; white-space: pre-wrap;
         }
         pre.json-box {
             background: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; 
-            font-family: monospace; font-size: 0.85em; white-space: pre-wrap; word-break: break-all;
+            font-family: monospace; font-size: 0.95em; white-space: pre-wrap; word-break: break-all;
         }
         .card { border-radius: 8px; padding: 10px; margin-bottom: 10px; border: 1px solid #e1e4e8; }
         .node-card { border-left: 5px solid #007bff; background: #f1f8ff; }
@@ -269,7 +269,7 @@
                     let val = targetData[key];
                     html += '<div class="prop-row">';
 
-                    if (key === 'llm_traces') {
+                    if (key === 'llm_traces' || key === 'function_traces') {
                         if (Array.isArray(val) && val.length > 0) {
                             html += `<div class="key collapsible" onclick="toggleCollapse(this)">${key}</div>`;
                             html += `<div class="value collapsible-content">`;
@@ -277,13 +277,21 @@
                             val.forEach((trace, index) => {
                                 html += `<div class="llm-trace-card">`;
                                 html += '<div class="prop-row">';
-                                html += `<div class="key collapsible" onclick="toggleCollapse(this)">LLM Trace ${index + 1}</div>`;
+                                if (key === 'llm_traces' ){
+                                    html += `<div class="key collapsible" onclick="toggleCollapse(this)">LLM Trace ${index + 1}</div>`;
+                                } else{
+                                    function_name = trace['function_name']
+                                    html += `<div class="key collapsible" onclick="toggleCollapse(this)">${function_name}</div>`;
+                                }
+                                
                                 html += `<div class="value collapsible-content">`;
 
                                 for (let traceKey in trace) {
                                     html += `<div class="prop-row llm-trace-inner-row">`; // Apply inner row style
-                                    
-                                    // All inner LLM trace fields are collapsible
+                                    if (traceKey === 'function_name'){
+                                        continue;
+                                    }
+                                    // All inner LLM and function trace fields are collapsible
                                     html += `<div class="key collapsible llm-trace-inner-key" onclick="toggleCollapse(this)">${traceKey}</div>`;
                                     html += `<div class="value collapsible-content">`;
                                     let displayValue = JSON.stringify(trace[traceKey], null, 2);
@@ -303,7 +311,13 @@
                             html += `<div class="key collapsible" onclick="toggleCollapse(this)">${key}</div>`;
                             // Content that shows up when expanded
                             html += `<div class="value collapsible-content">`;
-                            html += `<div class="llm-trace-card" style="padding: 10px; color: #888; font-style: italic;">No LLM Traced</div>`;
+                            if (key === 'llm_traces' ){
+                                place_holder = 'No LLM Traced'
+                            } else{
+                                place_holder = 'No Function Traced'
+
+                            }
+                            html += `<div class="llm-trace-card" style="padding: 10px; color: #888; font-style: italic;">${place_holder}</div>`;
                             html += `</div>`;
                         }
                     } else if (singleLevelCollapsible.includes(key) && typeof val === 'object' && val !== null && (!Array.isArray(val) || val.length > 0)) {
