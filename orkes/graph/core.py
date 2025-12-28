@@ -44,10 +44,11 @@ class OrkesGraph:
         {'messages': ['Hello from node1', 'Hello from node2']}
     """
 
-    def __init__(self, state, name:str = "default_graph", description:str = ""):
+    def __init__(self, state, name:str = "default_graph", description:str = "", traced: bool = True):
 
         self.state = state
         self.name = name
+        self.traced = traced
         self.description = description
         self.id = "graph_"+str(uuid.uuid4())
         self.START = _StartNode(self.state)
@@ -235,7 +236,11 @@ class OrkesGraph:
                 raise RuntimeError(f"Node '{node_name}' has an empty edge.")
         self._freeze = True
         
-        return GraphRunner(graph_name = self.name, graph_description=self.description, nodes_pool=self._nodes_pool, graph_type=self.state)
+        return GraphRunner(graph_name=self.name,
+                           graph_description=self.description,
+                           nodes_pool=self._nodes_pool,
+                           graph_type=self.state,
+                           traced=self.traced)
     
     def detect_loop(self):
         """

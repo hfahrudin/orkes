@@ -33,7 +33,7 @@ class GraphRunner:
         trace_inspector (TraceInspector): An object to generate a visualization of the trace.
     """
 
-    def __init__(self, graph_name:str, graph_description:str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces", auto_save_trace: bool = False):
+    def __init__(self, graph_name:str, graph_description:str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces", auto_save_trace: bool = False, traced: bool = True):
         """
         Initializes the GraphRunner.
 
@@ -44,6 +44,7 @@ class GraphRunner:
             traces_dir (str, optional): The directory to save traces. Defaults to "traces".
             auto_save_trace (bool, optional): Whether to automatically save traces.
                                             Defaults to False.
+            traced (bool, optional): Whether to enable tracing. Defaults to True.
         """
         self.state_def = graph_type
         self.nodes_pool = nodes_pool
@@ -51,22 +52,29 @@ class GraphRunner:
         self.run_id = str(uuid.uuid4())
         self.graph_name = graph_name
         self.graph_description = graph_description
-        self.trace = TracesSchema(
-            run_id=self.run_id,
-            graph_name=self.graph_name,
-            graph_description=self.graph_description,
-            nodes_trace=[v.node.node_trace for k, v in nodes_pool.items()],
-            edges_trace=[]
-        )
+        self.traced = traced
+        self.trace = None
+        self.trace_inspector = None
+        if self.traced:
+            self.trace = TracesSchema(
+                run_id=self.run_id,
+                graph_name=self.graph_name,
+                graph_description=self.graph_description,
+                nodes_trace=[v.node.node_trace for k, v in nodes_pool.items()],
+                edges_trace=[]
+            )
+            self.trace_inspector = TraceInspector()
+        
         self.traces_dir = traces_dir
         self.run_number = 0
         self.auto_save_trace = auto_save_trace
-        self.trace_inspector = TraceInspector()
 
     def save_run_trace(self):
         """
         Saves the execution trace to a JSON file.
         """
+        if not self.traced:
+            return
         if not os.path.exists(self.traces_dir):
             os.makedirs(self.traces_dir)
         filename = os.path.join(self.traces_dir, f"trace_{self.run_id}.json")
@@ -77,6 +85,10 @@ class GraphRunner:
         """
         Generates an HTML visualization of the execution trace.
         """
+        if not self.traced:
+            return
+        if not os.path.exists(self.traces_dir):
+            os.makedirs(self.traces_dir)
         base_name = f"trace_{self.run_id}_inspector.html"
         out_file = os.path.join(self.traces_dir, base_name)
         self.trace_inspector.generate_viz(self.trace.model_dump(), out_file)
@@ -105,70 +117,103 @@ class GraphRunner:
         start_pool = self.nodes_pool['START']
         start_edges = start_pool.edge
         
-        self.trace.start_time = time.time()
-
-        token = trace_var.set(self.trace)
-        try:
+        if self.traced:
+            self.trace.start_time = time.time()
+            token = trace_var.set(self.trace)
+            try:
+                self.traverse_graph(start_edges, input_state)
+            finally:
+                trace_var.reset(token)
+            
+            self.trace.elapsed_time = time.time() - self.trace.start_time
+            self.trace.status = "FINISHED"
+            if self.auto_save_trace:
+                self.save_run_trace()
+        else:
             self.traverse_graph(start_edges, input_state)
-        finally:
-            trace_var.reset(token)
-        
-        self.trace.elapsed_time = time.time() - self.trace.start_time
-        self.trace.status = "FINISHED"
-        if self.auto_save_trace:
-            self.save_run_trace()
+
         return self.graph_state
 
+
     def traverse_graph(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
-        """
-        Recursively traverses the graph, executing nodes and updating the state.
+        if self.traced:
+            self._traverse_traced(current_edge, input_state)
+        else:
+            self._traverse_untraced(current_edge, input_state)
 
-        Args:
-            current_edge (Union[ForwardEdge, ConditionalEdge]): The edge to traverse.
-            input_state (Dict): The current state of the graph.
+    def _traverse_untraced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
         """
+        Recursively traverses the graph without tracing, executing nodes and updating the state.
+        """
+        if current_edge.passes > current_edge.max_passes:
+            raise RuntimeError(
+                f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
+                "exceeding the allowed maximum without reaching a stop condition."
+            )
+        else:
+            current_edge.passes += 1
 
+        current_node = current_edge.from_node.node
+        if current_edge.edge_type == "__forward__":
+            if not isinstance(current_node, _StartNode):
+                result = current_node.execute(input_state)
+                self.graph_state.update(result)
+            
+            next_edge = current_edge.to_node.edge
+            next_node = current_edge.to_node.node
+        elif current_edge.edge_type == "__conditional__":
+            result = current_node.execute(input_state)
+            self.graph_state.update(result)
+
+            gate_function = current_edge.gate_function
+            condition = current_edge.condition
+            result_gate = gate_function(self.graph_state)
+
+            next_node_name = condition[result_gate]
+            
+            next_node = self.nodes_pool[next_node_name].node
+            next_edge = self.nodes_pool[next_node_name].edge
+
+        if not isinstance(next_node, _EndNode):
+            next_input = self.graph_state.copy()
+            self.traverse_graph(next_edge, next_input)
+
+    def _traverse_traced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
+        """
+        Recursively traverses the graph with tracing, executing nodes and updating the state.
+        """
         edge_token = edge_id_var.set(current_edge.id)
         try:
-            # Prevent infinite loops by checking the number of passes.
             if current_edge.passes > current_edge.max_passes:
                 raise RuntimeError(
                     f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
                     "exceeding the allowed maximum without reaching a stop condition."
                 )
             else:
-                current_edge.passes+=1
+                current_edge.passes += 1
                 self.run_number += 1
 
-            # Trace the edge traversal.
             edge_trace = current_edge.edge_trace.model_copy()
-            edge_trace.edge_run_number = self.run_number 
+            edge_trace.edge_run_number = self.run_number
             edge_trace.passes_left = current_edge.max_passes - current_edge.passes
             start = time.time()
             edge_trace.state_snapshot = input_state.copy()
-
 
             current_node = current_edge.from_node.node
             
             edge_trace_token = edge_trace_var.set(edge_trace)
             try:
                 if current_edge.edge_type == "__forward__":
-                    # Execute the node if it's not the start node.
                     if not isinstance(current_node, _StartNode):
-                        result =  current_node.execute(input_state)
+                        result = current_node.execute(input_state)
                         self.graph_state.update(result)
                     
-                    # Get the next edge and node.
                     next_edge = current_edge.to_node.edge
                     next_node = current_edge.to_node.node
-
-
                 elif current_edge.edge_type == "__conditional__":
-                    # Execute the node.
-                    result =  current_node.execute(input_state)
+                    result = current_node.execute(input_state)
                     self.graph_state.update(result)
 
-                    # Determine the next node based on the gate function's result.
                     gate_function = current_edge.gate_function
                     condition = current_edge.condition
                     result_gate = gate_function(self.graph_state)
@@ -184,12 +229,12 @@ class GraphRunner:
             edge_trace.elapsed = time.time() - start
             self.trace.edges_trace.append(edge_trace)
             
-            # Continue traversal if the next node is not the end node.
             if not isinstance(next_node, _EndNode):
                 next_input = self.graph_state.copy()
-                self.traverse_graph( next_edge, next_input)
+                self.traverse_graph(next_edge, next_input)
         finally:
             edge_id_var.reset(edge_token)
+
 
 # Handle Brancing and merging state -> because state update only happen after node process done, no shared mutable object
 # FAN IN FAN OUT STRATEGY, EVERY BRANCHING NODE NEED TO BE RETURNED
