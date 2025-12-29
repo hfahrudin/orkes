@@ -2,6 +2,7 @@ from typing import Optional, Dict, AsyncGenerator, Any, List
 import requests
 import json
 import aiohttp
+import asyncio
 from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
 from orkes.services.schema import LLMInterface
 from orkes.shared.schema import OrkesMessagesSchema
@@ -145,7 +146,7 @@ class UniversalLLMClient(LLMInterface):
             settings.update(overrides)
         return settings
 
-    def send_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, **kwargs) -> Dict:
+    def send_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, connection: Optional[Any] = None, **kwargs) -> Dict:
         """
         Sends a synchronous request to the LLM provider.
 
@@ -155,6 +156,8 @@ class UniversalLLMClient(LLMInterface):
                 be inferred from the provider.
             tools (Optional[List[Dict]], optional): A list of tools to provide to the
                 LLM. Defaults to None.
+            connection (Optional[Any], optional): The connection object from a web server,
+                which can be used to check for client disconnection. Defaults to None.
             **kwargs: Additional parameters to override the default settings.
 
         Returns:
@@ -208,7 +211,7 @@ class UniversalLLMClient(LLMInterface):
             # Re-raise the exception to be handled by the caller.
             raise
 
-    async def stream_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, **kwargs) -> AsyncGenerator[str, None]:
+    async def stream_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, connection: Optional[Any] = None, **kwargs) -> AsyncGenerator[str, None]:
         """
         Sends an asynchronous request to the LLM provider and streams the response.
 
@@ -218,6 +221,8 @@ class UniversalLLMClient(LLMInterface):
                 be inferred from the provider.
             tools (Optional[List[Dict]], optional): A list of tools to provide to the
                 LLM. Defaults to None.
+            connection (Optional[Any], optional): The connection object from a web server,
+                which can be used to check for client disconnection. Defaults to None.
             **kwargs: Additional parameters to override the default settings.
 
         Yields:
@@ -243,16 +248,24 @@ class UniversalLLMClient(LLMInterface):
 
         params = {}
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(full_url, headers=self.session_headers, json=payload, params=params) as response:
-                response.raise_for_status()
-                async for line in response.content:
-                    decoded_line = line.decode('utf-8').strip()
-                    if not decoded_line:
-                        continue
-                    text_chunk = self.provider.parse_stream_chunk(decoded_line)
-                    if text_chunk:
-                        yield text_chunk
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(full_url, headers=self.session_headers, json=payload, params=params) as response:
+                    response.raise_for_status()
+                    async for line in response.content:
+                        if connection and hasattr(connection, 'is_disconnected'):
+                            if await connection.is_disconnected():
+                                break
+                        
+                        decoded_line = line.decode('utf-8').strip()
+                        if not decoded_line:
+                            continue
+                        text_chunk = self.provider.parse_stream_chunk(decoded_line)
+                        if text_chunk:
+                            yield text_chunk
+        except (aiohttp.ClientError, asyncio.CancelledError):
+            # Gracefully handle client errors or cancellation (e.g., client disconnect)
+            pass
 
     def health_check(self, endpoint: str = "/health") -> bool:
         """
