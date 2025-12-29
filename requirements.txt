@@ -5,3 +5,4 @@ python-dotenv
 pytest
 pytest-html
 memory-profiler
+psutil

@@ -6,8 +6,7 @@ import inspect
 import sys
 
 def format_start_time(start_time: float) -> str:
-    """
-    Converts a Unix timestamp to a human-readable 'YYYY-MM-DD HH:MM:SS' format.
+    """Converts a Unix timestamp to a human-readable 'YYYY-MM-DD HH:MM:SS' format.
 
     Args:
         start_time (float): The Unix timestamp to convert.
@@ -19,9 +18,9 @@ def format_start_time(start_time: float) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 def format_elapsed_time(elapsed_seconds: float) -> str:
-    """
-    Formats a duration in seconds into a human-readable string with minutes,
-    seconds, milliseconds, and microseconds.
+    """Formats a duration in seconds into a human-readable string.
+
+    The string includes minutes, seconds, milliseconds, and microseconds.
 
     Args:
         elapsed_seconds (float): The duration in seconds.
@@ -38,42 +37,62 @@ def format_elapsed_time(elapsed_seconds: float) -> str:
     return f"{minutes}m {seconds}s {milliseconds}ms {microseconds}us"
 
 def get_instances_from_func(func, state, target_class):
+    """Retrieves all instances of a target class created within a function.
+
+    This function uses a trace to inspect the local variables of the given
+    function and returns all instances of the target class.
+
+    Args:
+        func (Callable): The function to inspect.
+        state: The state to pass to the function.
+        target_class (type): The class to look for.
+
+    Returns:
+        list: A list of instances of the target class.
+    """
     instances = []
 
     def tracer(frame, event, arg):
-        # We look at the 'return' event to see all locals before they are destroyed
         if event == 'return':
             for var_name, value in frame.f_locals.items():
                 if isinstance(value, target_class):
                     instances.append(value)
         return tracer
 
-    # Set the trace and run the function
     sys.settrace(tracer)
     try:
         func(state)
     finally:
-        sys.settrace(None) # Always stop tracing to prevent slowdowns
-    
+        sys.settrace(None)
+
     return instances
 
 
 def create_dict_from_typeddict(td_cls):
-    # Mapping of types to their "zero-value" defaults
+    """Creates a dictionary with default values from a TypedDict class.
+
+    This function takes a TypedDict class and creates a dictionary with keys
+    matching the TypedDict's annotations, and values set to their "zero-value"
+    defaults.
+
+    Args:
+        td_cls (type): The TypedDict class to use.
+
+    Returns:
+        dict: A dictionary with default values.
+    """
     type_defaults = {
         str: "",
         int: 0,
         bool: False,
         list: [],
-        List: [],  # Handles typing.List
+        List: [],
         dict: {}
     }
-    
-    # Extract annotations (keys and their types)
-    # Using __annotations__ works even if typing.get_type_hints fails
+
     annotations = td_cls.__annotations__
-    
+
     return {
-        key: type_defaults.get(val_type, None) 
+        key: type_defaults.get(val_type, None)
         for key, val_type in annotations.items()
     }

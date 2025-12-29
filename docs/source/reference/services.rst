@@ -1,4 +1,5 @@
 ============
 Services
 ============
-.. currentmodule:: orkes
+.. automodule:: orkes.services
+    :members:

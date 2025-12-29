@@ -1,4 +1,5 @@
 ============
 Shared
 ============
-.. currentmodule:: orkes
+.. automodule:: orkes.shared
+    :members:

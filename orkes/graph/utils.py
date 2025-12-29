@@ -10,6 +10,14 @@ def orkes_tracable(func):
     """
     A decorator that traces the input, output, and execution time of a function
     and records it in the current edge's trace.
+
+    This decorator is intended to be used on functions that are part of an OrkesGraph.
+    When a function decorated with `orkes_tracable` is executed during a traced
+    graph run, its inputs, output, and execution time will be captured and added
+    to the `function_traces` of the current edge trace.
+
+    If the function is executed outside of a traced graph run, it will behave
+    as if it were not decorated.
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -36,7 +44,7 @@ def orkes_tracable(func):
                 function_name=func.__name__,
                 input_args=args,
                 input_kwargs=kwargs,
-                return_value=str(result), 
+                return_value=str(result),
                 elapsed=elapsed
             )
 

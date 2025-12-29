@@ -10,8 +10,7 @@ from orkes.shared.context import edge_trace_var
 from orkes.graph.schema import LLMTraceSchema
 
 class LLMConfig:
-    """
-    A universal configuration object for any LLM connection.
+    """A universal configuration object for any LLM connection.
 
     This class holds the necessary configuration parameters to connect to an LLM provider,
     such as API keys, base URLs, and model names. It also allows for custom headers and
@@ -26,15 +25,14 @@ class LLMConfig:
                                        all requests, such as temperature and max_tokens.
     """
     def __init__(
-        self, 
-        api_key: str, 
-        base_url: str, 
-        model: str, 
+        self,
+        api_key: str,
+        base_url: str,
+        model: str,
         extra_headers: Optional[Dict[str, str]] = None,
         default_params: Optional[Dict[str, Any]] = None
     ):
-        """
-        Initializes the LLMConfig object.
+        """Initializes the LLMConfig object.
 
         Args:
             api_key (str): The API key for the LLM provider.
@@ -57,15 +55,14 @@ class LLMConfig:
 
 
 class vLLMConnection(LLMInterface):
-    """
-    LEGACY: This class is maintained for backward compatibility only.
-    
+    """LEGACY: This class is maintained for backward compatibility only.
+
     .. deprecated:: 0.1.0
        Use :class:`LLMFactory` for prebuilt connections or create your own connection
        using :class:`UniversalLLMClient`. `vLLMConnection` uses the OpenAI-compatible
        format which is being phased out.
     """
-    def __init__(self, url: str, model_name = str, headers: Optional[Dict[str, str]] = None, api_key = None):
+    def __init__(self, url: str, model_name=str, headers: Optional[Dict[str, str]] = None, api_key=None):
         self.url = url
         self.headers = headers.copy() if headers else {"Content-Type": "application/json"}
         if api_key:
@@ -80,7 +77,7 @@ class vLLMConnection(LLMInterface):
         }
         self.model_name = model_name
 
-    async def stream_message(self, message, end_point = "/v1/chat/completions", settings = None)  -> AsyncGenerator[str, None]:
+    async def stream_message(self, message, end_point="/v1/chat/completions", settings=None) -> AsyncGenerator[str, None]:
         full_url = self.url + end_point
         payload = {
             "messages": message,
@@ -105,15 +102,13 @@ class vLLMConnection(LLMInterface):
         response = requests.post(full_url, headers=self.headers, data=json.dumps(payload))
         return response
 
-
     def health_check(self, end_point="/health"):
         full_url = self.url + end_point
         return requests.get(full_url, headers=self.headers)
 
-#TODO: validate schema of responses of tools too
+
 class UniversalLLMClient(LLMInterface):
-    """
-    A universal client for interacting with various LLM providers.
+    """A universal client for interacting with various LLM providers.
 
     This client uses a strategy pattern to support different LLM providers, allowing
     for a consistent interface regardless of the underlying provider. It handles both
@@ -125,8 +120,7 @@ class UniversalLLMClient(LLMInterface):
         session_headers (Dict[str, str]): The headers to use for the session.
     """
     def __init__(self, config: LLMConfig, provider: LLMProviderStrategy):
-        """
-        Initializes the UniversalLLMClient.
+        """Initializes the UniversalLLMClient.
 
         Args:
             config (LLMConfig): The configuration for the LLM connection.
@@ -138,17 +132,14 @@ class UniversalLLMClient(LLMInterface):
         self.session_headers.update(self.config.headers)
 
     def _merge_settings(self, overrides: Optional[Dict]) -> Dict:
-        """
-        Merges default settings with any overrides.
-        """
+        """Merges default settings with any overrides."""
         settings = self.config.default_params.copy()
         if overrides:
             settings.update(overrides)
         return settings
 
     def send_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, connection: Optional[Any] = None, **kwargs) -> Dict:
-        """
-        Sends a synchronous request to the LLM provider.
+        """Sends a synchronous request to the LLM provider.
 
         Args:
             messages (OrkesMessagesSchema): The messages to send to the LLM.
@@ -163,6 +154,9 @@ class UniversalLLMClient(LLMInterface):
         Returns:
             Dict: A dictionary containing the raw response from the provider and the
                   parsed content.
+
+        Raises:
+            requests.RequestException: If the request fails.
         """
         if endpoint is None:
             if isinstance(self.provider, GoogleGeminiStrategy):
@@ -174,15 +168,15 @@ class UniversalLLMClient(LLMInterface):
 
         full_url = f"{self.config.base_url}{endpoint}"
 
-        settings=self._merge_settings(kwargs)
+        settings = self._merge_settings(kwargs)
         payload = self.provider.prepare_payload(
-            self.config.model, 
-            messages, 
-            stream=False, 
+            self.config.model,
+            messages,
+            stream=False,
             settings=settings,
             tools=tools
         )
-        
+
         params = {}
         edge_trace = edge_trace_var.get()
 
@@ -202,18 +196,15 @@ class UniversalLLMClient(LLMInterface):
                 )
                 edge_trace.llm_traces.append(llm_trace)
 
-            # Return raw data + parsed content for convenience
             return {
                 "raw": data,
                 "content": parsed_response.model_dump()
             }
         except requests.RequestException as e:
-            # Re-raise the exception to be handled by the caller.
             raise
 
     async def stream_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, connection: Optional[Any] = None, **kwargs) -> AsyncGenerator[str, None]:
-        """
-        Sends an asynchronous request to the LLM provider and streams the response.
+        """Sends an asynchronous request to the LLM provider and streams the response.
 
         Args:
             messages (OrkesMessagesSchema): The messages to send to the LLM.
@@ -227,8 +218,11 @@ class UniversalLLMClient(LLMInterface):
 
         Yields:
             str: A chunk of the response from the LLM.
+
+        Raises:
+            aiohttp.ClientError: If the request fails.
         """
-        if endpoint == None:
+        if endpoint is None:
             if isinstance(self.provider, GoogleGeminiStrategy):
                 endpoint = f"/models/{self.config.model}:streamGenerateContent?alt=sse"
             elif isinstance(self.provider, AnthropicStrategy):
@@ -239,9 +233,9 @@ class UniversalLLMClient(LLMInterface):
         full_url = f"{self.config.base_url}{endpoint}"
 
         payload = self.provider.prepare_payload(
-            self.config.model, 
-            messages, 
-            stream=True, 
+            self.config.model,
+            messages,
+            stream=True,
             settings=self._merge_settings(kwargs),
             tools=tools
         )
@@ -256,20 +250,18 @@ class UniversalLLMClient(LLMInterface):
                         if connection and hasattr(connection, 'is_disconnected'):
                             if await connection.is_disconnected():
                                 break
-                        
+
                         decoded_line = line.decode('utf-8').strip()
                         if not decoded_line:
                             continue
                         text_chunk = self.provider.parse_stream_chunk(decoded_line)
                         if text_chunk:
                             yield text_chunk
-        except (aiohttp.ClientError, asyncio.CancelledError):
-            # Gracefully handle client errors or cancellation (e.g., client disconnect)
-            pass
+        except (aiohttp.ClientError, asyncio.CancelledError) as e:
+            raise
 
     def health_check(self, endpoint: str = "/health") -> bool:
-        """
-        Performs a health check on the LLM provider.
+        """Performs a health check on the LLM provider.
 
         Args:
             endpoint (str, optional): The health check endpoint. Defaults to "/health".
@@ -286,14 +278,14 @@ class UniversalLLMClient(LLMInterface):
 
 
 class LLMFactory:
-    """
-    A factory for creating pre-configured :class:`UniversalLLMClient` instances for
-    various LLM providers.
+    """A factory for creating pre-configured :class:`UniversalLLMClient` instances.
+
+    This factory provides static methods to create clients for various LLM
+    providers, such as vLLM, OpenAI, Anthropic, and Google Gemini.
     """
     @staticmethod
     def create_vllm(url: str, model: str, api_key: str = "EMPTY", base_url: str = None) -> UniversalLLMClient:
-        """
-        Creates a client for a vLLM-compatible server.
+        """Creates a client for a vLLM-compatible server.
 
         Args:
             url (str): The URL of the vLLM server.
@@ -314,8 +306,7 @@ class LLMFactory:
 
     @staticmethod
     def create_openai(api_key: str, model: str = "gpt-4", base_url: str = "https://api.openai.com/v1") -> UniversalLLMClient:
-        """
-        Creates a client for the OpenAI API.
+        """Creates a client for the OpenAI API.
 
         Args:
             api_key (str): The OpenAI API key.
@@ -335,8 +326,7 @@ class LLMFactory:
 
     @staticmethod
     def create_anthropic(api_key: str, model: str = "claude-3-opus-20240229", base_url: str = "https://api.anthropic.com/v1") -> UniversalLLMClient:
-        """
-        Creates a client for the Anthropic API.
+        """Creates a client for the Anthropic API.
 
         Args:
             api_key (str): The Anthropic API key.
@@ -354,11 +344,10 @@ class LLMFactory:
             model=model
         )
         return UniversalLLMClient(config, AnthropicStrategy())
-    
+
     @staticmethod
     def create_gemini(api_key: str, model: str = "gemini-2.0-flash", base_url: str = "https://generativelanguage.googleapis.com/v1beta") -> UniversalLLMClient:
-        """
-        Creates a client for the Google Gemini API.
+        """Creates a client for the Google Gemini API.
 
         Args:
             api_key (str): The Google Gemini API key.

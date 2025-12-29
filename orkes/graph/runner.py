@@ -12,8 +12,7 @@ from orkes.shared.context import trace_var, edge_id_var, edge_trace_var
 from datetime import datetime
 
 class GraphRunner:
-    """
-    Executes a compiled OrkesGraph, managing state and tracing the execution.
+    """Executes a compiled OrkesGraph, managing state and tracing the execution.
 
     The GraphRunner takes a compiled graph and an initial state, then traverses the
     graph, executing the nodes and updating the state accordingly. It also records
@@ -33,12 +32,12 @@ class GraphRunner:
         trace_inspector (TraceInspector): An object to generate a visualization of the trace.
     """
 
-    def __init__(self, graph_name:str, graph_description:str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir:str = "traces", auto_save_trace: bool = False, traced: bool = True):
-        """
-        Initializes the GraphRunner.
+    def __init__(self, graph_name: str, graph_description: str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir: str = "traces", auto_save_trace: bool = False, traced: bool = True):
+        """Initializes the GraphRunner.
 
         Args:
             graph_name (str): The name of the graph.
+            graph_description (str): The description of the graph.
             nodes_pool (Dict[str, NodePoolItem]): The dictionary of nodes in the graph.
             graph_type (Dict): The TypedDict class that defines the shared state.
             traces_dir (str, optional): The directory to save traces. Defaults to "traces".
@@ -64,15 +63,13 @@ class GraphRunner:
                 edges_trace=[]
             )
             self.trace_inspector = TraceInspector()
-        
+
         self.traces_dir = traces_dir
         self.run_number = 0
         self.auto_save_trace = auto_save_trace
 
     def save_run_trace(self):
-        """
-        Saves the execution trace to a JSON file.
-        """
+        """Saves the execution trace to a JSON file."""
         if not self.traced:
             return
         if not os.path.exists(self.traces_dir):
@@ -82,9 +79,7 @@ class GraphRunner:
             json.dump(self.trace.model_dump(), f, indent=4)
 
     def visualize_trace(self):
-        """
-        Generates an HTML visualization of the execution trace.
-        """
+        """Generates an HTML visualization of the execution trace."""
         if not self.traced:
             return
         if not os.path.exists(self.traces_dir):
@@ -94,14 +89,16 @@ class GraphRunner:
         self.trace_inspector.generate_viz(self.trace.model_dump(), out_file)
 
     def run(self, invoke_state: Dict) -> Dict:
-        """
-        Runs the graph with a given initial state.
+        """Runs the graph with a given initial state.
 
         Args:
             invoke_state (Dict): The initial state to run the graph with.
 
         Returns:
             Dict: The final state of the graph after execution.
+
+        Raises:
+            KeyError: If the invoke_state contains keys not defined in the graph's state.
         """
         # Check that all keys in invoke_state exist in graph_state
         missing_keys = [key for key in invoke_state if key not in self.state_def.__annotations__]
@@ -112,11 +109,11 @@ class GraphRunner:
         # Merge invoke_state into a copy of graph_state (avoid mutating original)
         self.graph_state = invoke_state
         input_state = self.graph_state.copy()
-        
+
         # Start traversal from the START node
         start_pool = self.nodes_pool['START']
         start_edges = start_pool.edge
-        
+
         if self.traced:
             self.trace.start_time = time.time()
             token = trace_var.set(self.trace)
@@ -124,7 +121,7 @@ class GraphRunner:
                 self.traverse_graph(start_edges, input_state)
             finally:
                 trace_var.reset(token)
-            
+
             self.trace.elapsed_time = time.time() - self.trace.start_time
             self.trace.status = "FINISHED"
             if self.auto_save_trace:
@@ -134,16 +131,27 @@ class GraphRunner:
 
         return self.graph_state
 
-
     def traverse_graph(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
+        """Traverses the graph, either with or without tracing.
+
+        Args:
+            current_edge (Union[ForwardEdge, ConditionalEdge]): The current edge to traverse.
+            input_state (Dict): The current state of the graph.
+        """
         if self.traced:
             self._traverse_traced(current_edge, input_state)
         else:
             self._traverse_untraced(current_edge, input_state)
 
     def _traverse_untraced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
-        """
-        Recursively traverses the graph without tracing, executing nodes and updating the state.
+        """Recursively traverses the graph without tracing.
+
+        Args:
+            current_edge (Union[ForwardEdge, ConditionalEdge]): The current edge to traverse.
+            input_state (Dict): The current state of the graph.
+
+        Raises:
+            RuntimeError: If an edge is traversed more than the maximum allowed times.
         """
         if current_edge.passes > current_edge.max_passes:
             raise RuntimeError(
@@ -158,7 +166,7 @@ class GraphRunner:
             if not isinstance(current_node, _StartNode):
                 result = current_node.execute(input_state)
                 self.graph_state.update(result)
-            
+
             next_edge = current_edge.to_node.edge
             next_node = current_edge.to_node.node
         elif current_edge.edge_type == "__conditional__":
@@ -170,7 +178,7 @@ class GraphRunner:
             result_gate = gate_function(self.graph_state)
 
             next_node_name = condition[result_gate]
-            
+
             next_node = self.nodes_pool[next_node_name].node
             next_edge = self.nodes_pool[next_node_name].edge
 
@@ -179,8 +187,14 @@ class GraphRunner:
             self.traverse_graph(next_edge, next_input)
 
     def _traverse_traced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict):
-        """
-        Recursively traverses the graph with tracing, executing nodes and updating the state.
+        """Recursively traverses the graph with tracing.
+
+        Args:
+            current_edge (Union[ForwardEdge, ConditionalEdge]): The current edge to traverse.
+            input_state (Dict): The current state of the graph.
+
+        Raises:
+            RuntimeError: If an edge is traversed more than the maximum allowed times.
         """
         edge_token = edge_id_var.set(current_edge.id)
         try:
@@ -200,14 +214,14 @@ class GraphRunner:
             edge_trace.state_snapshot = input_state.copy()
 
             current_node = current_edge.from_node.node
-            
+
             edge_trace_token = edge_trace_var.set(edge_trace)
             try:
                 if current_edge.edge_type == "__forward__":
                     if not isinstance(current_node, _StartNode):
                         result = current_node.execute(input_state)
                         self.graph_state.update(result)
-                    
+
                     next_edge = current_edge.to_node.edge
                     next_node = current_edge.to_node.node
                 elif current_edge.edge_type == "__conditional__":
@@ -219,16 +233,16 @@ class GraphRunner:
                     result_gate = gate_function(self.graph_state)
 
                     next_node_name = condition[result_gate]
-                    
+
                     next_node = self.nodes_pool[next_node_name].node
                     next_edge = self.nodes_pool[next_node_name].edge
                     edge_trace.to_node = next_node_name
             finally:
                 edge_trace_var.reset(edge_trace_token)
-                
+
             edge_trace.elapsed = time.time() - start
             self.trace.edges_trace.append(edge_trace)
-            
+
             if not isinstance(next_node, _EndNode):
                 next_input = self.graph_state.copy()
                 self.traverse_graph(next_edge, next_input)

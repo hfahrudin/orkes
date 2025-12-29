@@ -6,8 +6,7 @@ from orkes.graph.runner import GraphRunner
 import uuid
 
 class OrkesGraph:
-    """
-    A class to represent a stateful graph for orchestrating multi-agent workflows.
+    """A class to represent a stateful graph for orchestrating multi-agent workflows.
 
     The OrkesGraph allows you to define a graph of nodes, where each node is a function
     that operates on a shared state. The graph can have a single start and end point,
@@ -17,6 +16,7 @@ class OrkesGraph:
         state (type): The TypedDict class that defines the shared state of the graph.
         name (str): The name of the graph.
         description (str): A description of the graph.
+        traced (bool): Whether to trace the graph execution.
 
     Example:
         >>> from typing import TypedDict, List
@@ -44,18 +44,28 @@ class OrkesGraph:
         {'messages': ['Hello from node1', 'Hello from node2']}
     """
 
-    def __init__(self, state, name:str = "default_graph", description:str = "", traced: bool = True):
+    def __init__(self, state, name: str = "default_graph", description: str = "", traced: bool = True):
+        """Initializes an OrkesGraph.
 
+        Args:
+            state (type): The TypedDict class that defines the shared state of the graph.
+            name (str, optional): The name of the graph. Defaults to "default_graph".
+            description (str, optional): A description of the graph. Defaults to "".
+            traced (bool, optional): Whether to trace the graph execution. Defaults to True.
+
+        Raises:
+            TypeError: If the state is not a TypedDict class.
+        """
         self.state = state
         self.name = name
         self.traced = traced
         self.description = description
-        self.id = "graph_"+str(uuid.uuid4())
+        self.id = "graph_" + str(uuid.uuid4())
         self.START = _StartNode(self.state)
         self.END = _EndNode(self.state)
         self._nodes_pool: Dict[str, NodePoolItem] = {
-            "START" : NodePoolItem(node=self.START),
-            "END" : NodePoolItem(node=self.END)
+            "START": NodePoolItem(node=self.START),
+            "END": NodePoolItem(node=self.END)
         }
         self._edges_pool: List[Edge] = []
         if not is_typeddict_class(state):
@@ -64,17 +74,21 @@ class OrkesGraph:
         self._freeze = False
 
     def add_node(self, name: str, func: Callable):
-        """
-        Adds a node to the graph.
+        """Adds a node to the graph.
 
         Args:
             name (str): The name of the node. Must be unique.
             func (Callable): The function associated with the node. This function must
                          accept a parameter of the same type as the graph's state.
+
+        Raises:
+            RuntimeError: If the graph has been compiled.
+            ValueError: If a node with the same name already exists.
+            TypeError: If the function signature does not match the graph state.
         """
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
-    
+
         if name in self._nodes_pool:
             raise ValueError(f"Agent '{name}' already exists.")
 
@@ -84,36 +98,32 @@ class OrkesGraph:
             )
         self._nodes_pool[name] = NodePoolItem(node=Node(name, func, self.state))
 
-
     def add_edge(self, from_node: Union[str, _StartNode], to_node: Union[str, _EndNode], max_passes: int = 25) -> None:
-        """
-        Adds a forward edge between two nodes.
+        """Adds a forward edge between two nodes.
 
         Args:
             from_node (Union[str, _StartNode]): The starting node of the edge.
             to_node (Union[str, _EndNode]): The ending node of the edge.
             max_passes (int, optional): The maximum number of times this edge can be
                                       traversed. Defaults to 25.
+
+        Raises:
+            RuntimeError: If the graph has been compiled.
         """
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
 
         from_node_item = self._validate_from_node(from_node)
-
         to_node_item = self._validate_to_node(to_node)
-
         edge = ForwardEdge(from_node_item, to_node_item, max_passes=max_passes)
-
         self._nodes_pool[from_node_item.node.name].edge = edge
         self._edges_pool.append(edge)
         if to_node_item == self._nodes_pool['END']:
             # A special token to indicate that the graph has reached its end.
             to_node_item.edge = "<END GRAPH TOKEN>"
 
-
     def add_conditional_edge(self, from_node: Union[str, _StartNode], gate_function: Callable, condition: Dict[str, str], max_passes: int = 25):
-        """
-        Adds a conditional edge from a node.
+        """Adds a conditional edge from a node.
 
         The `gate_function` determines which branch to take based on its return value.
         The `condition` dictionary maps the return values of the `gate_function` to
@@ -127,10 +137,14 @@ class OrkesGraph:
                                       `gate_function` to the next node.
             max_passes (int, optional): The maximum number of times this edge can be
                                       traversed. Defaults to 25.
+
+        Raises:
+            RuntimeError: If the graph has been compiled.
+            TypeError: If the gate_function's signature does not match the graph state.
         """
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
-        
+
         from_node_item = self._validate_from_node(from_node)
 
         if not function_assertion(gate_function, self.state):
@@ -147,8 +161,14 @@ class OrkesGraph:
             self._nodes_pool["END"].edge = "<END GRAPH TOKEN>"
 
     def _validate_condition(self, condition: Dict[str, Union[str, Node]]):
-        """
-        Validates the condition dictionary for a conditional edge.
+        """Validates the condition dictionary for a conditional edge.
+
+        Args:
+            condition (Dict[str, Union[str, Node]]): The condition dictionary.
+
+        Raises:
+            ValueError: If a condition branch points to a non-existent node.
+            TypeError: If a condition branch maps to an invalid type.
         """
         for key, target in condition.items():
             # If the target is a string, it must be a registered node.
@@ -166,17 +186,27 @@ class OrkesGraph:
                 )
 
     def _validate_from_node(self, from_node: Union[str, _StartNode]):
-        """
-        Validates the 'from_node' of an edge.
+        """Validates the 'from_node' of an edge.
+
+        Args:
+            from_node (Union[str, _StartNode]): The starting node of the edge.
+
+        Returns:
+            NodePoolItem: The node pool item for the 'from_node'.
+
+        Raises:
+            RuntimeError: If the graph has been compiled or if the edge is already assigned.
+            TypeError: If 'from_node' is not a string or the START node.
+            ValueError: If 'from_node' does not exist.
         """
         if self._freeze:
             raise RuntimeError("Cannot modify after compile")
-        
-        if not (isinstance(from_node, str) or from_node is self.START ):
+
+        if not (isinstance(from_node, str) or from_node is self.START):
             raise TypeError(f"'from_node' must be str or START, got {type(from_node)}")
 
         # TODO: The node should return the graph.
-        
+
         if isinstance(from_node, str):
             if from_node not in self._nodes_pool:
                 raise ValueError(f"From node '{from_node}' does not exist")
@@ -186,14 +216,23 @@ class OrkesGraph:
 
         if from_node_item.edge is not None:
             raise RuntimeError("Edge already assigned to this node.")
-        
+
         return from_node_item
-    
+
     def _validate_to_node(self, to_node: Union[str, _EndNode]):
+        """Validates the 'to_node' of an edge.
+
+        Args:
+            to_node (Union[str, _EndNode]): The ending node of the edge.
+
+        Returns:
+            NodePoolItem: The node pool item for the 'to_node'.
+
+        Raises:
+            TypeError: If 'to_node' is not a string or the END node.
+            ValueError: If 'to_node' does not exist.
         """
-        Validates the 'to_node' of an edge.
-        """
-        if not (isinstance(to_node, str) or to_node is self.END ):
+        if not (isinstance(to_node, str) or to_node is self.END):
             raise TypeError(f"'to_node' must be str or END, got {type(to_node)}")
 
         if isinstance(to_node, str):
@@ -205,8 +244,7 @@ class OrkesGraph:
         return to_node_item
 
     def compile(self):
-        """
-        Compiles the graph, making it ready for execution.
+        """Compiles the graph, making it ready for execution.
 
         This method checks the integrity of the graph, ensuring that all nodes have
         edges and that the start and end points are properly configured. Once compiled,
@@ -214,6 +252,9 @@ class OrkesGraph:
 
         Returns:
             GraphRunner: An object that can run the compiled graph.
+
+        Raises:
+            RuntimeError: If the graph entry or end point is not assigned, or if a node has an empty edge.
         """
         # Check if the start point is connected.
         if not self._nodes_pool['START'].edge:
@@ -222,7 +263,7 @@ class OrkesGraph:
         # Check if the end point is connected.
         if not self._nodes_pool['END'].edge:
             raise RuntimeError("The Graph end point is not assigned")
-        
+
         # Ensure all edges have a destination.
         for edge in self._edges_pool:
             if edge.edge_type == "__forward__":
@@ -235,16 +276,15 @@ class OrkesGraph:
             if not node.edge:  # Checks if edge is empty
                 raise RuntimeError(f"Node '{node_name}' has an empty edge.")
         self._freeze = True
-        
+
         return GraphRunner(graph_name=self.name,
                            graph_description=self.description,
                            nodes_pool=self._nodes_pool,
                            graph_type=self.state,
                            traced=self.traced)
-    
+
     def detect_loop(self):
-        """
-        Detects loops in the graph.
+        """Detects loops in the graph.
 
         Returns:
             bool: True if a loop is detected, False otherwise.
@@ -253,9 +293,15 @@ class OrkesGraph:
         visited_path = set()
         return self._walk_graph(start_pool, visited_path)
 
-    def _walk_graph(self, current_node_item: NodePoolItem, path: set):
-        """
-        Recursively walks the graph to detect loops.
+    def _walk_graph(self, current_node_item: NodePoolItem, path: set) -> bool:
+        """Recursively walks the graph to detect loops.
+
+        Args:
+            current_node_item (NodePoolItem): The current node to visit.
+            path (set): A set of visited node names in the current path.
+
+        Returns:
+            bool: True if a loop is detected, False otherwise.
         """
         current_node = current_node_item.node
         current_node_name = current_node.name

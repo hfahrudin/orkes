@@ -1,9 +1,8 @@
-"""
-This module defines `ContextVar` objects used for propagating contextual information
-across asynchronous and concurrent operations within the Orkes framework.
+"""This module defines `ContextVar` objects for propagating contextual information.
 
 These context variables allow trace and execution-specific data to be accessible
-throughout a call chain without explicit parameter passing.
+throughout a call chain without explicit parameter passing, which is particularly
+useful in asynchronous and concurrent operations within the Orkes framework.
 """
 
 from contextvars import ContextVar

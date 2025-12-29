@@ -1,4 +1,6 @@
 ============
 Graph
 ============
-.. currentmodule:: orkes
+
+.. automodule:: orkes.graph
+   :members:

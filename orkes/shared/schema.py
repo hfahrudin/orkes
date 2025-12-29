@@ -2,11 +2,11 @@ from typing import Any, Dict, List, Optional, Callable, Union
 from pydantic import BaseModel
 
 class ToolParameter(BaseModel):
-    """
-    Represents the JSON Schema for the parameters of a tool.
+    """Represents the JSON Schema for the parameters of a tool.
 
     This class defines the structure of the parameters that a tool can accept,
-    following the JSON Schema specification.
+    following the JSON Schema specification. This allows for clear and
+    unambiguous definition of a tool's inputs.
 
     Attributes:
         type (str): The type of the parameter, which is 'object' by default.
@@ -20,15 +20,19 @@ class ToolParameter(BaseModel):
     required: Optional[List[str]] = None
 
 class OrkesToolSchema(BaseModel):
-    """
-    A universal schema for defining a tool that can be used by an LLM.
+    """A universal schema for defining a tool that can be used by an LLM.
+
+    This schema is used to define a tool that can be used by an LLM. It contains
+    all the necessary information for the LLM to understand what the tool does,
+    what parameters it accepts, and how to call it.
 
     Attributes:
         name (str): The name of the tool.
         description (str): A description of what the tool does.
         parameters (ToolParameter): The schema for the parameters that the tool
                                    accepts.
-        function (Callable): The actual callable function for the tool.
+        function (Callable, optional): The actual callable function for the tool.
+                                       Defaults to None.
     """
     name: str
     description: str
@@ -40,11 +44,14 @@ class OrkesToolSchema(BaseModel):
     }
 
 class OrkesMessageSchema(BaseModel):
-    """
-    Represents a single message in a conversation with an LLM.
+    """Represents a single message in a conversation with an LLM.
+
+    This schema is used to represent a single message in a conversation with an
+    LLM. A conversation is typically a sequence of messages, where each message
+    has a role, content, and optionally a content type and tool call ID.
 
     Attributes:
-        role (str): The role of the message's author, such as 'user', 'system', 
+        role (str): The role of the message's author, such as 'user', 'system',
                     'assistant', or 'tool'.
         content (Union[str, List[Dict], None]): The content of the message. Can be a string,
                                      a list of dictionaries (for tool calls),
@@ -60,8 +67,10 @@ class OrkesMessageSchema(BaseModel):
 
 
 class OrkesMessagesSchema(BaseModel):
-    """
-    Represents a list of messages to be sent to an LLM as part of a request.
+    """Represents a list of messages to be sent to an LLM as part of a request.
+
+    This is a container for a list of `OrkesMessageSchema` objects, representing
+    a complete conversation or a turn in a conversation.
 
     Attributes:
         messages (List[OrkesMessageSchema]): A list of messages.
@@ -71,9 +80,11 @@ class OrkesMessagesSchema(BaseModel):
 
 
 class ToolDefinition(BaseModel):
-    """
-    A universal schema for defining a tool that can be used by an LLM, with methods
-    to convert the tool definition to different provider-specific formats.
+    """A universal schema for defining a tool that can be used by an LLM.
+
+    This schema provides methods to convert the tool definition to different
+    provider-specific formats, such as for OpenAI, Google Gemini, and Anthropic
+    Claude.
 
     Attributes:
         name (str): The name of the tool.
@@ -86,8 +97,10 @@ class ToolDefinition(BaseModel):
     parameters: ToolParameter
 
     def to_openai(self) -> Dict[str, Any]:
-        """
-        Converts the tool definition to the format expected by OpenAI and vLLM.
+        """Converts the tool definition to the format expected by OpenAI and vLLM.
+
+        Returns:
+            Dict[str, Any]: The tool definition in OpenAI's format.
         """
         return {
             "type": "function",
@@ -95,8 +108,10 @@ class ToolDefinition(BaseModel):
         }
 
     def to_gemini(self) -> Dict[str, Any]:
-        """
-        Converts the tool definition to the format expected by Google Gemini.
+        """Converts the tool definition to the format expected by Google Gemini.
+
+        Returns:
+            Dict[str, Any]: The tool definition in Gemini's format.
         """
         dump = self.model_dump()
         return {
@@ -106,8 +121,10 @@ class ToolDefinition(BaseModel):
         }
 
     def to_claude(self) -> Dict[str, Any]:
-        """
-        Converts the tool definition to the format expected by Anthropic Claude.
+        """Converts the tool definition to the format expected by Anthropic Claude.
+
+        Returns:
+            Dict[str, Any]: The tool definition in Claude's format.
         """
         return {
             "name": self.name,

@@ -1,4 +1,6 @@
 ============
 Visualizer
 ============
-.. currentmodule:: orkes
+.. automodule:: orkes.visualizer
+    :members:
+
