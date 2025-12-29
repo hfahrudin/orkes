@@ -17,17 +17,6 @@ You can install the latest stable version of the Orkes using pip:
 
     pip install orkes
 
-From source
-~~~~~~~~~~~
-
-To install from source, clone the repository and install in editable mode:
-
-.. code-block:: bash
-
-    git clone https://github.com/hfahrudin/orkes.git
-    cd orkes
-    pip install -e .
-
 Verifying the Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 

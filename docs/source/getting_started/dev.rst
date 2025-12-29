@@ -57,6 +57,6 @@ The report is located in the `reports` folder at the root of your project:
 
 .. code-block:: text
 
-    reports/report_{test_type}_{timestamp}.html
+    tests/reports/report_{test_type}_{timestamp}.html
 
 Open this file in your web browser to examine the test outcomes.
