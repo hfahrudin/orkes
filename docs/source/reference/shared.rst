@@ -12,7 +12,9 @@ Schemas
 
 .. autosummary::
    :toctree: ../api/
-
+   
+   ToolCallSchema
+   RequestSchema
    ToolParameter
    OrkesToolSchema
    OrkesMessageSchema

@@ -30,8 +30,6 @@ Schemas
 .. autosummary::
    :toctree: ../api/
 
-   ToolCallSchema
-   RequestSchema
    LLMProviderStrategy
    LLMInterface
 
