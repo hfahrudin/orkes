@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, TYPE_CHECKING, Union, List, Dict, Any
-from orkes.shared.schema import OrkesMessagesSchema
-from orkes.services.schema import RequestSchema
+from orkes.shared.schema import OrkesMessagesSchema, RequestSchema
 from datetime import datetime
 
 if TYPE_CHECKING:

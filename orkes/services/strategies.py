@@ -1,6 +1,7 @@
 from typing import Optional, Dict,List
 import json
-from orkes.services.schema import LLMProviderStrategy, RequestSchema, ToolCallSchema
+from orkes.services.schema import LLMProviderStrategy
+from orkes.shared.schema import RequestSchema, ToolCallSchema
 from typing import Optional, Dict,List, Union
 from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
 

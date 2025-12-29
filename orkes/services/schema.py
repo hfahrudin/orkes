@@ -2,34 +2,8 @@ from typing import Optional, Dict, AsyncGenerator, Any, List, Union
 from abc import ABC, abstractmethod
 from requests import Response
 from pydantic import BaseModel
-from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
+from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema, RequestSchema
 
-class ToolCallSchema(BaseModel):
-    """Represents a tool call requested by the LLM.
-
-    This schema defines the structure of a tool call, which includes the name of the
-    function to be called and the arguments to pass to it.
-
-    Attributes:
-        function_name (str): The name of the function to be called.
-        arguments (Dict[str, Any]): A dictionary of arguments for the function.
-    """
-    function_name: str
-    arguments: Dict[str, Any]
-
-class RequestSchema(BaseModel):
-    """Represents a standard response from an LLM.
-
-    This schema defines the structure of a response from an LLM, which can be either
-    a string of content or a list of tool calls.
-
-    Attributes:
-        content_type (str): The type of content in the response, either 'text' or
-                            'tool_calls'.
-        content (Union[str, List[ToolCallSchema]]): The content of the response.
-    """
-    content_type: str
-    content : Union[str, List[ToolCallSchema]]
 
 class LLMProviderStrategy(ABC):
     """Abstract base class for LLM provider strategies.
