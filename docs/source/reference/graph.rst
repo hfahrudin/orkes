@@ -6,7 +6,7 @@ Graph
 
 .. currentmodule:: orkes.graph
 
-Graph
+Core
 -----
 
 .. autosummary::

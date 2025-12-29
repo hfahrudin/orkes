@@ -15,7 +15,8 @@ The following subpackages are available:
 
 .. toctree::
    :maxdepth: 2
-
+   :hidden:
+   
    reference/agents
    reference/graph
    reference/services

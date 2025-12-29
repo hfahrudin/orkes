@@ -4,6 +4,7 @@
 Introduction
 ===============
 
+Orkes is a powerful Python library designed to facilitate the creation, execution, and observation of AI-driven workflows and agentic systems. It provides robust tools for building complex applications that leverage Large Language Models (LLMs) and custom logic, all orchestrated through a flexible graph-based approach. **Designed with a philosophy of low abstraction, Orkes allows users to easily "hack" and customize its components, ensuring maximum flexibility and adaptability to unique requirements.**
 
 Installation
 ------------
