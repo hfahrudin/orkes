@@ -19,7 +19,7 @@ The Observability Gap
 ~~~~~~~~~~~~~~~~~~~~~
 Because some populare frameworks gatekeep it's Visualization platform, observability for developer often becomes a second priority. Without out-of-the-box I/O and state observation, we faced a *black box* effect.
 
-The result? The we cannot understand where on when agent began to hallucinate. We fell into the trap of "spray and pray" prompt engineering, only to realize the "intelligence" wasn't the problem—the failure lay in the framewrok inherent tool calling prompt (ie.).
+The result? The we cannot understand where on when agent began to hallucinate. We fell into the trap of "spray and pray" prompt engineering, only to realize the "intelligence" wasn't the problem, turned out (for example) the failure lay in the framewrok inherent tool calling prompt.
 
 Mission
 ~~~~~~~
