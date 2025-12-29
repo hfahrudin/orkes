@@ -6,11 +6,12 @@ schema.
 
 The following subpackages are available:
 
-* :doc:`orkes.agents <agents>`: Agent Boilerplates to build to modularized agentic flow.
-* :doc:`orkes.graph <graph>`: Public API for graph orchestration and plotting.
-* :doc:`orkes.services <services>`: Service-layer functions and utility classes.
-* :doc:`orkes.shared <shared>`: Shared utilities and core extension classes.
-* :doc:`orkes.visualizer <visualizer>`: Tools for visualizing graph runs and node execution.
+* ``orkes.agents``: Agent Boilerplates to build to modularized agentic flow.
+* ``orkes.graph``: Public API for graph orchestration and plotting.
+* ``orkes.services``: Service-layer functions and utility classes.
+* ``orkes.shared``: Shared utilities and core extension classes.
+* ``orkes.visualizer``: Tools for visualizing graph runs and node execution.
+
 
 .. toctree::
    :maxdepth: 2

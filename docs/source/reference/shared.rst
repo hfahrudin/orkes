@@ -6,12 +6,6 @@ Shared
 
 .. currentmodule:: orkes.shared
 
-.. autosummary::
-   :toctree: ../api/
-
-   edge_id_var
-   trace_var
-   edge_trace_var
 
 Schemas
 -------
@@ -35,3 +29,14 @@ Utilities
    format_elapsed_time
    get_instances_from_func
    create_dict_from_typeddict
+
+
+Context
+-------
+
+.. autosummary::
+   :toctree: ../api/
+
+   edge_id_var
+   trace_var
+   edge_trace_var

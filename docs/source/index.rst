@@ -19,4 +19,3 @@ Welcome!
    getting_started/index
    user_guide/index
    api
-   reference/index

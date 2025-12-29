@@ -24,16 +24,6 @@ Clients
    UniversalLLMClient
    LLMFactory
 
-Response Handling
------------------
-
-.. autosummary::
-   :toctree: ../api/
-
-   ResponseInterface
-   ChatResponse
-   StreamResponseBuffer
-
 Schemas
 -------
 

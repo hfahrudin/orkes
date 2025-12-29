@@ -4,7 +4,7 @@ import datetime
 from datetime import datetime
 
 # This allows Sphinx to find 'orkes' in the directory above /docs
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -54,3 +54,5 @@ autodoc_pydantic_settings_show_json = False
 autodoc_default_options = {
     'imported-members': False, 
 }
+
+autodoc_typehints = "description"
