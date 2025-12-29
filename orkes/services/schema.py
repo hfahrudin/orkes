@@ -40,6 +40,7 @@ class LLMProviderStrategy(ABC):
     """
 
     @abstractmethod
+
     def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[Dict]] = None) -> Dict:
         """Prepares the payload for a request to the LLM provider.
 
@@ -57,6 +58,7 @@ class LLMProviderStrategy(ABC):
         pass
 
     @abstractmethod
+
     def parse_response(self, response_data: Dict) -> RequestSchema:
         """Parses a response from the LLM provider.
 
@@ -69,6 +71,7 @@ class LLMProviderStrategy(ABC):
         pass
 
     @abstractmethod
+
     def parse_stream_chunk(self, chunk: str) -> Optional[str]:
         """Parses a single chunk of a streaming response.
 
@@ -82,6 +85,7 @@ class LLMProviderStrategy(ABC):
         pass
 
     @abstractmethod
+
     def get_headers(self, api_key: str) -> Dict[str, str]:
         """Gets the authentication headers for the LLM provider.
 
@@ -94,6 +98,7 @@ class LLMProviderStrategy(ABC):
         pass
 
     @abstractmethod
+
     def get_messages_payload(self, messages: OrkesMessagesSchema) -> List[Dict]:
         """Converts an Orkes message schema to a format suitable for the LLM provider.
 
@@ -106,6 +111,7 @@ class LLMProviderStrategy(ABC):
         pass
 
     @abstractmethod
+
     def get_tools_payload(self, tools: List[OrkesToolSchema]) -> List[Dict]:
         """Converts an Orkes tool schema to a format suitable for the LLM provider.
 

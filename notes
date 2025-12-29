@@ -1,2 +1,3 @@
 sphinx-apidoc -o docs/source/api/ ./orkes
 sphinx-build -M html docs/source docs/build
+make clean && make html

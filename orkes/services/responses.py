@@ -11,6 +11,7 @@ class ResponseInterface(ABC):
     responses from an LLM.
     """
     @abstractmethod
+
     def parse_stream_response(self, chunk: bytes, **kwargs) -> str:
         """Parses a single chunk of a streaming response from the LLM.
 
@@ -24,6 +25,7 @@ class ResponseInterface(ABC):
         pass
 
     @abstractmethod
+
     def parse_full_response(self, payload: dict) -> dict:
         """Parses a full, non-streaming response from the LLM.
 
@@ -36,6 +38,7 @@ class ResponseInterface(ABC):
         pass
 
     @abstractmethod
+
     def _generate_event(self, buffer: list) -> str:
         """Generates a Server-Sent Event (SSE) from the given data.
 
@@ -60,7 +63,7 @@ class ChatResponse(ResponseInterface):
 
         Args:
             end_token (str, optional): The end-of-transmission token. Defaults to
-                                     "<|eot_id|>".
+                                     "``<|eot_id|>``".
         """
         self.eot_token = end_token
 

@@ -12,7 +12,8 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx_copybutton',
-    'sphinxcontrib.autodoc_pydantic'
+    'sphinxcontrib.autodoc_pydantic',
+    'sphinx.ext.autosummary'
 ]
 
 # 3. Theme setup

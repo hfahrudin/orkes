@@ -1,6 +1,15 @@
+.. _visualizer:
+
 ============
 Visualizer
 ============
-.. automodule:: orkes.visualizer
-    :members:
 
+.. currentmodule:: orkes.visualizer
+
+Classes
+-------
+
+.. autosummary::
+   :toctree: ../api/
+
+   TraceInspector
