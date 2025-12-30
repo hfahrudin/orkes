@@ -1,10 +1,12 @@
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 import datetime
+import ast
+import inspect
+import sys
 
 def format_start_time(start_time: float) -> str:
-    """
-    Converts a Unix timestamp to a human-readable 'YYYY-MM-DD HH:MM:SS' format.
+    """Converts a Unix timestamp to a human-readable 'YYYY-MM-DD HH:MM:SS' format.
 
     Args:
         start_time (float): The Unix timestamp to convert.
@@ -16,9 +18,9 @@ def format_start_time(start_time: float) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 def format_elapsed_time(elapsed_seconds: float) -> str:
-    """
-    Formats a duration in seconds into a human-readable string with minutes,
-    seconds, milliseconds, and microseconds.
+    """Formats a duration in seconds into a human-readable string.
+
+    The string includes minutes, seconds, milliseconds, and microseconds.
 
     Args:
         elapsed_seconds (float): The duration in seconds.
@@ -34,65 +36,63 @@ def format_elapsed_time(elapsed_seconds: float) -> str:
 
     return f"{minutes}m {seconds}s {milliseconds}ms {microseconds}us"
 
-class ToolParameter(BaseModel):
+def get_instances_from_func(func, state, target_class):
+    """Retrieves all instances of a target class created within a function.
+
+    This function uses a trace to inspect the local variables of the given
+    function and returns all instances of the target class.
+
+    Args:
+        func (Callable): The function to inspect.
+        state: The state to pass to the function.
+        target_class (type): The class to look for.
+
+    Returns:
+        list: A list of instances of the target class.
     """
-    Represents the JSON Schema for the parameters of a tool.
+    instances = []
 
-    This class defines the structure of the parameters that a tool can accept,
-    following the JSON Schema specification.
+    def tracer(frame, event, arg):
+        if event == 'return':
+            for var_name, value in frame.f_locals.items():
+                if isinstance(value, target_class):
+                    instances.append(value)
+        return tracer
 
-    Attributes:
-        type (str): The type of the parameter, which is 'object' by default.
-        properties (Dict[str, Any]): A dictionary defining the properties of the
-                                    object, where each key is a parameter name and
-                                    the value is its schema.
-        required (Optional[List[str]]): A list of required parameter names.
+    sys.settrace(tracer)
+    try:
+        func(state)
+    finally:
+        sys.settrace(None)
+
+    return instances
+
+
+def create_dict_from_typeddict(td_cls):
+    """Creates a dictionary with default values from a TypedDict class.
+
+    This function takes a TypedDict class and creates a dictionary with keys
+    matching the TypedDict's annotations, and values set to their "zero-value"
+    defaults.
+
+    Args:
+        td_cls (type): The TypedDict class to use.
+
+    Returns:
+        dict: A dictionary with default values.
     """
-    type: str = "object"
-    properties: Dict[str, Any]
-    required: Optional[List[str]] = None
+    type_defaults = {
+        str: "",
+        int: 0,
+        bool: False,
+        list: [],
+        List: [],
+        dict: {}
+    }
 
-class ToolDefinition(BaseModel):
-    """
-    A universal schema for defining a tool that can be used by an LLM, with methods
-    to convert the tool definition to different provider-specific formats.
+    annotations = td_cls.__annotations__
 
-    Attributes:
-        name (str): The name of the tool.
-        description (str): A description of what the tool does.
-        parameters (ToolParameter): The schema for the parameters that the tool
-                                   accepts.
-    """
-    name: str
-    description: str
-    parameters: ToolParameter
-
-    def to_openai(self) -> Dict[str, Any]:
-        """
-        Converts the tool definition to the format expected by OpenAI and vLLM.
-        """
-        return {
-            "type": "function",
-            "function": self.model_dump()
-        }
-
-    def to_gemini(self) -> Dict[str, Any]:
-        """
-        Converts the tool definition to the format expected by Google Gemini.
-        """
-        dump = self.model_dump()
-        return {
-            "name": dump["name"],
-            "description": dump["description"],
-            "parameters": dump["parameters"]
-        }
-
-    def to_claude(self) -> Dict[str, Any]:
-        """
-        Converts the tool definition to the format expected by Anthropic Claude.
-        """
-        return {
-            "name": self.name,
-            "description": self.description,
-            "input_schema": self.parameters.model_dump()
-        }
+    return {
+        key: type_defaults.get(val_type, None)
+        for key, val_type in annotations.items()
+    }

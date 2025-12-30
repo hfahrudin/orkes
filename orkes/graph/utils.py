@@ -1,6 +1,59 @@
 import inspect
 from typing import Callable
 import random
+from functools import wraps
+import time
+from orkes.shared.context import edge_trace_var
+from orkes.graph.schema import FunctionTraceSchema
+
+def orkes_tracable(func):
+    """
+    A decorator that traces the input, output, and execution time of a function
+    and records it in the current edge's trace.
+
+    This decorator is intended to be used on functions that are part of an OrkesGraph.
+    When a function decorated with `orkes_tracable` is executed during a traced
+    graph run, its inputs, output, and execution time will be captured and added
+    to the `function_traces` of the current edge trace.
+
+    If the function is executed outside of a traced graph run, it will behave
+    as if it were not decorated.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        edge_trace = edge_trace_var.get()
+        if not edge_trace:
+            return func(*args, **kwargs)
+
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start_time
+
+        # Attempt to create the trace object once
+        try:
+            function_trace = FunctionTraceSchema(
+                function_name=func.__name__,
+                input_args=args,
+                input_kwargs=kwargs,
+                return_value=result, # Try original result
+                elapsed=elapsed
+            )
+        except Exception:
+            # Fallback if result isn't serializable
+            function_trace = FunctionTraceSchema(
+                function_name=func.__name__,
+                input_args=args,
+                input_kwargs=kwargs,
+                return_value=str(result),
+                elapsed=elapsed
+            )
+
+        if edge_trace.function_traces is None:
+            edge_trace.function_traces = []
+
+        edge_trace.function_traces.append(function_trace)
+        return result
+    return wrapper
 
 def function_assertion(func: Callable, expected_type: type) -> bool:
     """

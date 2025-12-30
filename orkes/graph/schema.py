@@ -1,5 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union, List, Dict, Any
+from orkes.shared.schema import OrkesMessagesSchema, RequestSchema
+from datetime import datetime
 
 if TYPE_CHECKING:
     from orkes.graph.unit import Node, Edge
@@ -42,6 +44,43 @@ class NodeTrace(BaseModel):
     node_description: Optional[str] = None
     meta: dict
 
+class LLMTraceSchema(BaseModel):
+    """
+    Represents the input and output of an LLM interaction for tracking purposes.
+
+    Attributes:
+        messages (OrkesMessagesSchema): The messages sent to the LLM.
+        tools (Optional[List[Dict]]): The tools provided to the LLM.
+        parsed_response (RequestSchema): The parsed response from the LLM.
+        edge_id (Optional[str]): The ID of the graph edge that triggered this interaction.
+        model (str): The name of the model used.
+        settings (Optional[Dict]): Any additional settings used for the request.
+    """
+    messages: OrkesMessagesSchema
+    tools: Optional[List[Dict]] = None
+    parsed_response: RequestSchema
+    model: str
+    settings: Optional[Dict] = None
+
+
+class FunctionTraceSchema(BaseModel):
+    """
+    Represents the trace of a single function's execution, capturing its inputs,
+    output, and timing.
+
+    Attributes:
+        function_name (str): The name of the traced function.
+        input_args (tuple): The positional arguments passed to the function.
+        input_kwargs (dict): The keyword arguments passed to the function.
+        return_value (Any): The value returned by the function.
+        elapsed (float): The Unix timestamp when the function execution finished.
+    """
+    function_name: str
+    input_args: tuple
+    input_kwargs: dict
+    return_value: Any
+    elapsed: float
+
 class EdgeTrace(BaseModel):
     """
     Represents the trace of a single edge traversal during a graph execution.
@@ -64,6 +103,11 @@ class EdgeTrace(BaseModel):
         state_snapshot (dict): Snapshot of relevant runtime state at the moment
             the edge was traversed.
         meta (dict): Additional metadata associated with this edge traversal.
+        llm_traces (list[LLMTraceSchema]): A list of LLM traces that occurred
+                                           during this edge's execution.
+        function_traces (list[FunctionTraceSchema]): A list of function traces
+                                                     that occurred during this
+                                                     edge's execution.
     """
     edge_id: str
     edge_run_number: int
@@ -74,6 +118,9 @@ class EdgeTrace(BaseModel):
     elapsed: float
     state_snapshot: dict = {}
     meta: dict
+    function_traces: List[FunctionTraceSchema] = []
+    llm_traces: List[LLMTraceSchema] = []
+
 
 class TracesSchema(BaseModel):
     """

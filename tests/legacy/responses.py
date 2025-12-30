@@ -5,14 +5,15 @@ from requests.models import Response
 
 
 class ResponseInterface(ABC):
-    """
-    An abstract base class for handling LLM responses. It defines the interface
-    for parsing both streaming and full responses from an LLM.
+    """An abstract base class for handling LLM responses.
+
+    This interface defines the methods for parsing both streaming and full
+    responses from an LLM.
     """
     @abstractmethod
+
     def parse_stream_response(self, chunk: bytes, **kwargs) -> str:
-        """
-        Parses a single chunk of a streaming response from the LLM.
+        """Parses a single chunk of a streaming response from the LLM.
 
         Args:
             chunk (bytes): A chunk of the response.
@@ -24,9 +25,9 @@ class ResponseInterface(ABC):
         pass
 
     @abstractmethod
+
     def parse_full_response(self, payload: dict) -> dict:
-        """
-        Parses a full, non-streaming response from the LLM.
+        """Parses a full, non-streaming response from the LLM.
 
         Args:
             payload (dict): The full response payload.
@@ -37,9 +38,9 @@ class ResponseInterface(ABC):
         pass
 
     @abstractmethod
+
     def _generate_event(self, buffer: list) -> str:
-        """
-        Generates a Server-Sent Event (SSE) from the given data.
+        """Generates a Server-Sent Event (SSE) from the given data.
 
         Args:
             buffer (list): A list of strings to be included in the event.
@@ -50,26 +51,24 @@ class ResponseInterface(ABC):
         pass
 
 class ChatResponse(ResponseInterface):
-    """
-    A response handler for chat-based LLM responses, particularly for streaming
-    responses using Server-Sent Events (SSE).
+    """A response handler for chat-based LLM responses.
+
+    This class is designed for streaming responses using Server-Sent Events (SSE).
 
     Attributes:
         eot_token (str): The end-of-transmission token to signal the end of a stream.
     """
     def __init__(self, end_token: str = "<|eot_id|>"):
-        """
-        Initializes the ChatResponse handler.
+        """Initializes the ChatResponse handler.
 
         Args:
             end_token (str, optional): The end-of-transmission token. Defaults to
-                                     "<|eot_id|>".
+                                     "``<|eot_id|>``".
         """
         self.eot_token = end_token
 
     def parse_stream_response(self, chunk: bytes, sse: bool = False) -> str:
-        """
-        Parses a single chunk of a streaming response.
+        """Parses a single chunk of a streaming response.
 
         Args:
             chunk (bytes): A chunk of the response.
@@ -103,18 +102,15 @@ class ChatResponse(ResponseInterface):
             return self._generate_event([v])
         else:
             return v
-            
+
     def _generate_event(self, buffer: list) -> str:
-        """
-        Generates an SSE event from a buffer of content.
-        """
+        """Generates an SSE event from a buffer of content."""
         event = {"v": "".join(buffer)}
         return f"event: delta\ndata: {json.dumps(event)}\n\n"
 
     def parse_full_response(self, payload: dict) -> dict:
-        """
-        Parses a full, non-streaming response.
-        
+        """Parses a full, non-streaming response.
+
         Note:
             This method is a placeholder and currently returns the payload as is.
         """
@@ -122,8 +118,7 @@ class ChatResponse(ResponseInterface):
 
 
 class StreamResponseBuffer:
-    """
-    A buffer for handling streaming responses from an LLM.
+    """A buffer for handling streaming responses from an LLM.
 
     This class accumulates chunks of a streaming response and yields them as
     complete events, either when the buffer is full or when the stream ends.
@@ -135,8 +130,7 @@ class StreamResponseBuffer:
         eot_token (str): The end-of-transmission token.
     """
     def __init__(self, llm_response: Type[ResponseInterface], headers=None, eot_token: str = "<EOT_TOKEN>"):
-        """
-        Initializes the StreamResponseBuffer.
+        """Initializes the StreamResponseBuffer.
 
         Args:
             llm_response (Type[ResponseInterface]): The response handler.
@@ -149,14 +143,16 @@ class StreamResponseBuffer:
         self.eot_token = eot_token
 
     async def stream(self, response: Response, buffer_size: int = 10, trigger_connection=None):
-        """
-        Streams the response, buffering and yielding events.
+        """Streams the response, buffering and yielding events.
 
         Args:
             response (Response): The response object to stream.
             buffer_size (int, optional): The size of the buffer. Defaults to 10.
             trigger_connection (optional): A connection object to check for
                                          disconnections. Defaults to None.
+
+        Yields:
+            str: An SSE event string.
         """
         buffer = []
 
@@ -166,11 +162,11 @@ class StreamResponseBuffer:
                     if await trigger_connection.is_disconnected():
                         response.close()
                         break
-                
+
                 delta_content = self.llm_response.parse_stream_response(chunk)
-                
+
                 if delta_content == self.eot_token:
-                    break  
+                    break
 
                 if buffer_size > 0:
                     buffer.append(delta_content)
@@ -184,13 +180,7 @@ class StreamResponseBuffer:
 
         else:
             print(f"Error: {response.status_code}, {response.text}")
-    
-    def _is_buffer_full(self, buffer: list, buffer_size: int) -> bool:
-        """
-        Checks if the buffer has reached the specified size.
 
-        Note:
-            Currently, this is based on the number of chunks, but it could be
-            based on other metrics in the future.
-        """
+    def _is_buffer_full(self, buffer: list, buffer_size: int) -> bool:
+        """Checks if the buffer has reached the specified size."""
         return len(buffer) >= buffer_size

@@ -4,3 +4,10 @@ uvicorn
 python-dotenv
 pytest
 pytest-html
+memory-profiler
+psutil
+sphinxcontrib-mermaid
+sphinx-copybutton
+autodoc_pydantic
+pydata-sphinx-theme
+aiohttp
