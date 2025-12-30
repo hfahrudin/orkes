@@ -8,16 +8,13 @@ This section introduces the fundamental building blocks of Orkes. Understanding 
 
 .. mermaid::
 
-   graph TD
-       A[OrkesGraph] --> B(State);
-       B --> C{Node 1};
-       B --> D{Node 2};
-       C --> B;
-       D --> B;
-       style A fill:#f9f,stroke:#333,stroke-width:2px;
-       style B fill:#bbf,stroke:#333,stroke-width:2px;
-       style C fill:#ccf,stroke:#333,stroke-width:2px;
-       style D fill:#ccf,stroke:#333,stroke-width:2px;
+   sequenceDiagram
+       participant OrkesGraph
+       participant State
+       participant Node
+       OrkesGraph->State: Initializes with
+       State->Node: Passed to
+       Node->State: Modifies
 
    A high-level overview of Orkes's core concepts.
 

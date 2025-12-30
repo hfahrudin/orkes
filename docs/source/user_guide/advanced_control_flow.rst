@@ -28,14 +28,15 @@ Conditional edges work by using a "gate function". This is a simple Python funct
 
 .. mermaid::
 
-   graph TD
-       A[Source Node] --> B{Gate Function};
-       B -- "Returns 'Path A'" --> C[Destination Node A];
-       B -- "Returns 'Path B'" --> D[Destination Node B];
-       style A fill:#f9f,stroke:#333,stroke-width:2px;
-       style B fill:#bbf,stroke:#333,stroke-width:2px;
-       style C fill:#ccf,stroke:#333,stroke-width:2px;
-       style D fill:#ccf,stroke:#333,stroke-width:2px;
+   sequenceDiagram
+        participant SourceNode
+        participant GateFunction
+        participant DestinationNodeA
+        participant DestinationNodeB
+
+        SourceNode->>GateFunction: Executes
+        GateFunction-->>DestinationNodeA: Returns 'Path A'
+        GateFunction-->>DestinationNodeB: Returns 'Path B'
 
    A conditional edge allows the graph to branch based on the state.
 

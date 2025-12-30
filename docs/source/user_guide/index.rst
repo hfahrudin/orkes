@@ -22,8 +22,9 @@ This guide is structured to be read sequentially, but feel free to jump to the s
 
 Here is a brief overview of what you will find in this guide:
 
-- **Core Concepts**: An introduction to the fundamental building blocks of Orkes: `OrkesGraph`, `State`, `Nodes`, and `Edges`.
+- **Core Concepts**: An introduction to the fundamental building blocks of Orkes.
 - **Building Your First Graph**: A step-by-step tutorial on how to create and run a simple workflow.
 - **Connecting Custom LLMs**: Learn how to connect Orkes to any LLM service.
+- **Tool Calling**: A guide to have fine-grained control over how tools are defined and used.
 - **Orkes Tracer**: A guide to using the powerful tracing and visualization tools.
-- **Best Practices**: A collection of tips and recommendations for using Orkes efficiently and effectively.
+- **Best Practices**: A collection of tips and recommendations for using Orkes effectively.

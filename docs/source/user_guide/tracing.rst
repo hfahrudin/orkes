@@ -54,11 +54,14 @@ This will create an HTML file that you can open in your browser.
 
 .. mermaid::
 
-   graph TD
-       A[Start] --> B(Node 1: Process Input);
-       B --> C(Node 2: LLM Call);
-       C --> D(Node 3: Process Output);
-       D --> E[End];
+   sequenceDiagram
+       participant User
+       participant OrkesGraph
+       User->>OrkesGraph: Run graph
+       OrkesGraph->>OrkesGraph: Node 1: Process Input
+       OrkesGraph->>OrkesGraph: Node 2: LLM Call
+       OrkesGraph->>OrkesGraph: Node 3: Process Output
+       OrkesGraph-->>User: Return final state
 
    The interactive trace inspector provides a detailed view of your graph's execution.
 
