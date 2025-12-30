@@ -36,6 +36,10 @@ html_theme_options = {
     "github_url": "https://github.com/hfahrudin/orkes",
     "show_nav_level": 2,
     "footer_start": ["orkes_footer"],
+    "secondary_sidebar_items": {
+        "**": ["page-toc"],
+        "index": ["page-toc"],
+    }
 }
 
 html_favicon = "../../assets/orkes_icon.png"
