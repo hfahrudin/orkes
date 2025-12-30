@@ -1,6 +1,6 @@
 <h2 align="center">
   <img width="17%" alt="Orkes logo" src="assets/orkes.png"><br/>
-  No abstractions. No black boxes. Just your Agent
+  No abstractions. No black boxes. Just Your Logic
 </h2>
 <p align="center">
   <a href="https://badge.fury.io/py/orkes">
@@ -14,7 +14,7 @@
   </a>
 </p>
 
-Orkes is a Python library for building, coordinating, and observing complex AI workflows powered by Large Language Models (LLMs). It provides a flexible and intuitive graph-based framework that emphasizes explicit control flow, transparent logic, and comprehensive traceability.
+Orkes is a Python library for building, coordinating, and observing any complex workflow that can be represented as a graph. While it is well-suited for building LLM-powered agentic systems, its core focus is on providing a flexible and intuitive graph-based framework with an emphasis on explicit control flow, transparent logic, and comprehensive traceability.
 
 ## Core Concepts
 

@@ -4,7 +4,7 @@
 Introduction
 ===============
 
-Built for developers who need total control, Orkes is a low-abstraction, lightweight, Python library focused on (not limited) orchestrating agentic workflows. It combines the ability to deeply customize core components with native observation tools, allowing you to monitor execution and inspect agentic behavior in real-time. Orkes provides the transparency required to move complex systems from experimental hacks to reliable, observable environments.
+Built for developers who need total control, Orkes is a low-abstraction, lightweight, Python library for orchestrating complex workflows. While it is well-suited for agentic systems, its core focus is on providing a general-purpose graph-based framework that combines deep customization with native observation tools. Orkes provides the transparency required to move complex systems from experimental hacks to reliable, observable environments.
 
 Background
 ----------
@@ -23,7 +23,7 @@ The result? The we cannot understand where on when agent began to hallucinate. W
 
 Mission
 ~~~~~~~
-Orkes was built to close these gaps. By keeping abstractions low and making I/O and execution observation a first-class citizen, ensure that the intelligence of your agents isn't undermined by the "complex" networking layer.
+Orkes was built to close these gaps. By keeping abstractions low and making I/O and execution observation a first-class citizen, Orkes ensures that your application's logic isn't undermined by the complexity of the underlying systems.
 
 
 Installation

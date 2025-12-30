@@ -4,7 +4,7 @@
 Features
 ========
 
-Orkes is designed with a focus on providing a clear, flexible, and powerful framework for building complex AI workflows. Here are some of the key features that make this possible:
+Orkes is designed with a focus on providing a clear, flexible, and powerful framework for building complex workflows. Here are some of the key features that make this possible:
 
 Graph-based Architecture
 ------------------------
@@ -42,4 +42,4 @@ You can also easily implement your own custom strategies to connect to any other
 
 Agent and Tool Support
 ----------------------
-While the graph-based architecture is the core of Orkes, it also provides support for building and using agents and tools. You can define custom tools using the ``OrkesToolSchema`` and use them within your graph's nodes to interact with external APIs, databases, or other services. This allows you to build sophisticated agent-like behaviors within the structured and controllable environment of an Orkes graph.
+While the graph-based architecture is the core of Orkes, it also provides support for building and using agents and tools. You can define custom tools using the ``OrkesToolSchema`` and use them within your graph's nodes to interact with external APIs, databases, or other services. This allows you to build sophisticated, interactive systems within the structured and controllable environment of an Orkes graph.
