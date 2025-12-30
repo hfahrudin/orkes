@@ -39,7 +39,7 @@ build-backend = "setuptools.build_meta"
 
 [project.urls]
 "Homepage" = "https://github.com/hfahrudin/orkes"
-"Documentation" = "https://your-docs-url.com" # Placeholder for your documentation URL
+"Documentation" = "https://orkes.readthedocs.io/" 
 
 
 [tool.setuptools]
