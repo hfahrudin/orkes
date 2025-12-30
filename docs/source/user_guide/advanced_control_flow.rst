@@ -26,25 +26,21 @@ Conditional edges work by using a "gate function". This is a simple Python funct
 2. The Conditional Edge
 -----------------------
 
-.. mermaid::
-
-   sequenceDiagram
-        participant SourceNode
-        participant GateFunction
-        participant DestinationNodeA
-        participant DestinationNodeB
-
-        SourceNode->>GateFunction: Executes
-        GateFunction-->>DestinationNodeA: Returns 'Path A'
-        GateFunction-->>DestinationNodeB: Returns 'Path B'
-
-   A conditional edge allows the graph to branch based on the state.
-
 You create a conditional edge using the ``add_conditional_edge`` method. This method takes four arguments:
 - The name of the source node.
 - The gate function.
 - A dictionary that maps the possible return values of the gate function to the names of the destination nodes.
 - (Optional) A default destination node, if none of the keys in the dictionary match the return value of the gate function.
+
+
+.. mermaid::
+
+    graph TD
+        subgraph Conditional Edge
+            A[set_number] --> B{is_even_or_odd};
+            B -- "returns 'even'" --> C[process_even];
+            B -- "returns 'odd'" --> D[process_odd];
+        end
 
 .. code-block:: python
 
@@ -77,6 +73,15 @@ You create a conditional edge using the ``add_conditional_edge`` method. This me
 3. Looping
 ----------
 You can create loops by routing a conditional edge back to a previous node in the graph. Orkes has a built-in mechanism to prevent infinite loops. The ``GraphRunner`` has a ``max_passes`` parameter (defaulting to 10) that will stop the execution if the graph runs for too many steps.
+
+.. mermaid::
+
+    graph TD
+        subgraph Looping
+            A[increment_node] --> B{counter_gate};
+            B -- "returns 'continue'" --> A;
+            B -- "returns 'finish'" --> C[END];
+        end
 
 .. code-block:: python
 

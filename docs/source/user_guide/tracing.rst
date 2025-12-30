@@ -52,18 +52,10 @@ To generate the visualization, use the ``visualize_trace`` method on the ``Graph
 
 This will create an HTML file that you can open in your browser.
 
-.. mermaid::
-
-   sequenceDiagram
-       participant User
-       participant OrkesGraph
-       User->>OrkesGraph: Run graph
-       OrkesGraph->>OrkesGraph: Node 1: Process Input
-       OrkesGraph->>OrkesGraph: Node 2: LLM Call
-       OrkesGraph->>OrkesGraph: Node 3: Process Output
-       OrkesGraph-->>User: Return final state
-
-   The interactive trace inspector provides a detailed view of your graph's execution.
+.. image:: ../../../assets/inspector-example.png
+   :alt: Inspector Snippets
+   :width: 450px
+   :align: center
 
 The visualization shows:
 

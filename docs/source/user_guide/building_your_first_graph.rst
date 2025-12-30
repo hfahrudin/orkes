@@ -42,6 +42,19 @@ Next, we'll create an ``OrkesGraph`` instance and define a simple Python functio
 -------------------------------
 Now, we define the flow of execution using edges. We'll connect the start of the graph to our ``greeter`` node, and the ``greeter`` node to the end of the graph.
 
+.. mermaid::
+
+    graph TD
+        subgraph Greeting Graph
+            START[START] --> Greeter[greeter];
+            Greeter --> END[END];
+        end
+
+        subgraph Data Flow
+             InitialState[GreetingState] --> Greeter;
+             Greeter --> FinalState[GreetingState];
+        end
+
 .. code-block:: python
 
     # ... (graph and node definition)

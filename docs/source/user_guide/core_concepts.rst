@@ -8,15 +8,19 @@ This section introduces the fundamental building blocks of Orkes. Understanding 
 
 .. mermaid::
 
-   sequenceDiagram
-       participant OrkesGraph
-       participant State
-       participant Node
-       OrkesGraph->State: Initializes with
-       State->Node: Passed to
-       Node->State: Modifies
+   graph TD
+      subgraph OrkesGraph
+          START[START] --> NODE1["Node: my_node_function"]
+          NODE1 --> END[END]
+      end
 
-   A high-level overview of Orkes's core concepts.
+      subgraph "Data Flow (State)"
+          INPUT[MyState] -- "passed to" --> NODE1
+          NODE1 -- "returns modified" --> OUTPUT[MyState]
+      end
+
+      style START fill:#f9f,stroke:#333,stroke-width:2px
+      style END fill:#f9f,stroke:#333,stroke-width:2px
 
 1. The OrkesGraph
 ------------------

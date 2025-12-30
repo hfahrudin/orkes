@@ -32,10 +32,21 @@ Here's an example of how to define a ``get_weather`` tool:
         }
     )
 
-Using the Tool in a Workflow
-----------------------------
 
-Once you have defined your tool, you can pass it to the ``send_message`` method of your client. The LLM will then decide whether to call the tool based on the user's message.
+.. mermaid::
+
+    sequenceDiagram
+        participant User
+        participant Application (Orkes)
+        participant LLM
+
+        User->>Application: "What is the weather in San Francisco?"
+        Application->>LLM: send_message(messages, tools=[get_weather_tool])
+        LLM-->>Application: response with tool_calls
+        Application->>Application: Execute get_weather("San Francisco")
+        Application->>LLM: send_message(messages=[..., tool_result])
+        LLM-->>Application: Final weather report
+        Application-->>User: Here is the weather...
 
 .. code-block:: python
 
