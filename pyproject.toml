@@ -1,7 +1,7 @@
 [project]
 name = "orkes"
-version = "0.1.1"
-description = "Lightweight multi-agent orchestration framework"
+version = "0.1.3"
+description = "A lightweight orchestration framework for LLM agents, no abstractions you don’t need, no bloated APIs, just clean coordination logic that works."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -9,7 +9,28 @@ authors = [
   { name = "Hasby Fahrudin", email = "fahrudinhasby12@gmail.com" }
 ]
 dependencies = [
-  "pydantic>=2.0"
+  "pydantic>=2.0",
+  "aiohttp"
+]
+
+# Optional dependencies are installed via `pip install ".[<group_name>]"`
+# For example, `pip install ".[dev]"` or `pip install ".[docs]"`
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-html",
+    "memory-profiler",
+    "psutil",
+    "fastapi",
+    "uvicorn",
+    "python-dotenv"
+]
+docs = [
+    "sphinx",
+    "sphinxcontrib-mermaid",
+    "sphinx-copybutton",
+    "autodoc_pydantic",
+    "pydata-sphinx-theme"
 ]
 
 [build-system]
@@ -18,6 +39,7 @@ build-backend = "setuptools.build_meta"
 
 [project.urls]
 "Homepage" = "https://github.com/hfahrudin/orkes"
+"Documentation" = "https://your-docs-url.com" # Placeholder for your documentation URL
 
 
 [tool.setuptools]
