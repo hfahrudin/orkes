@@ -1,8 +1,18 @@
-# Orkes: A Python Library for Building and Coordinating Agentic Workflows with Transparancy
-
-[![PyPI version](https://badge.fury.io/py/orkes.svg)](https://badge.fury.io/py/orkes)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docs](https://img.shields.io/readthedocs/orkes?logo=read-the-docs&style=flat-square)](https://orkes.readthedocs.io/)
+<h2 align="center">
+  <img width="17%" alt="Model2Vec logo" src="assets/orkes.png"><br/>
+  No abstractions. No black boxes. Just your Agent
+</h2>
+<p align="center">
+  <a href="https://badge.fury.io/py/orkes">
+    <img src="https://badge.fury.io/py/orkes.svg" alt="PyPI version">
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
+  </a>
+  <a href="https://orkes.readthedocs.io/">
+    <img src="https://img.shields.io/readthedocs/orkes?logo=read-the-docs&style=flat-square" alt="Docs">
+  </a>
+</p>
 
 Orkes is a Python library for building, coordinating, and observing complex AI workflows powered by Large Language Models (LLMs). It provides a flexible and intuitive graph-based framework that emphasizes explicit control flow, transparent logic, and comprehensive traceability.
 
