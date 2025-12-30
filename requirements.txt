@@ -6,3 +6,4 @@ pytest
 pytest-html
 memory-profiler
 psutil
+sphinxcontrib-mermaid

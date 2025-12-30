@@ -13,7 +13,8 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx_copybutton',
     'sphinxcontrib.autodoc_pydantic',
-    'sphinx.ext.autosummary'
+    'sphinx.ext.autosummary',
+    'sphinxcontrib.mermaid'
 ]
 
 # 3. Theme setup
@@ -33,12 +34,8 @@ html_theme_options = {
     ],
     "navbar_align": "left",
     "github_url": "https://github.com/hfahrudin/orkes",
+    "show_nav_level": 2,
     "footer_start": ["orkes_footer"],
-    "secondary_sidebar_items": {
-        "**": ["page-toc"],
-        "index": ["page-toc"],
-    }
-
 }
 
 html_favicon = "../../assets/orkes_icon.png"
