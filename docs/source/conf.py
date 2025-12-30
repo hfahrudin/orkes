@@ -20,7 +20,7 @@ extensions = [
 # 3. Theme setup
 html_theme = 'pydata_sphinx_theme'
 project = 'orkes'  # This is the text in the header
-version = "0.1.3"
+version = "0.1.3.1"
 html_title = f'orkes v{version} documentation' # Appears in the browser tab and header
 
 # To add a logo image (relative to your html_static_path)
