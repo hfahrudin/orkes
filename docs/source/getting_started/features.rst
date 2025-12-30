@@ -1,32 +1,45 @@
 .. _features:
 
-===============
+========
 Features
-===============
+========
 
-Graph-based Workflows
----------------------
-*   **OrkesGraph**: Define and manage intricate computational graphs that serve as the backbone for your AI workflows. These graphs allow for clear representation of dependencies and execution flow between different components. **The interface for defining these graphs is inspired by the well-known `NetworkX` library, providing a familiar and powerful paradigm for graph manipulation.**
-*   **GraphRunner**: Execute the defined graphs efficiently, handling the orchestration of nodes and edges to process data and manage state transitions.
-*   **Nodes and Edges**: Construct graphs using versatile `Node` and `Edge` primitives, including `ForwardEdge` for sequential steps and `ConditionalEdge` for branching logic based on dynamic conditions.
-*   **Detailed Tracing**: Gain deep insights into graph execution with comprehensive tracing capabilities. Capture `NodeTrace`, `LLMTraceSchema`, `FunctionTraceSchema`, and `EdgeTrace` to monitor performance, debug issues, and understand the flow of information.
+Orkes is designed with a focus on providing a clear, flexible, and powerful framework for building complex AI workflows. Here are some of the key features that make this possible:
 
-Agent System
---------------
-*   **Agent and AgentInterface**: Develop and integrate sophisticated AI agents that can perform tasks, make decisions, and interact with various tools and services. The `AgentInterface` provides a structured way to define their capabilities and communication protocols.
+Graph-based Architecture
+------------------------
+At the core of Orkes is the ``OrkesGraph``, a powerful abstraction for defining and managing computational workflows. This graph-based architecture allows you to represent complex logic as a collection of nodes and edges, providing a clear and intuitive way to visualize and control the flow of execution.
 
-LLM Integration
-----------------
-*   **UniversalLLMClient**: Interact seamlessly with a variety of Large Language Models through a unified client interface. This abstraction simplifies the process of switching between different LLM providers and managing their configurations.
-*   **LLMFactory**: Dynamically create and configure LLM connections based on specified `LLMConfig` settings, ensuring flexible and scalable access to AI models.
-*   **Pluggable Strategies**: Out-of-the-box support for popular LLM providers including `OpenAIStyleStrategy` (for OpenAI-compatible APIs), `AnthropicStrategy`, and `GoogleGeminiStrategy`, allowing you to leverage the best models for your use case. **Furthermore, Orkes empowers users to implement and integrate their own custom LLM strategies, extending support beyond the built-in solutions to any LLM service or local model.**
+The interface for defining these graphs is inspired by the well-known `NetworkX <https://networkx.org/>`__ library, providing a familiar and powerful paradigm for those with experience in graph-based programming.
 
-Tooling & Schema Management
-----------------------------
-*   **OrkesToolSchema**: Define custom tools that your agents or graph nodes can utilize, enabling them to interact with external APIs, databases, or custom functions in a structured manner.
-*   **OrkesMessageSchema**: Standardized schemas for messages (`OrkesMessageSchema`, `OrkesMessagesSchema`) facilitate clear and consistent communication within your graph-based workflows and agent interactions.
-*   **ToolDefinition and ToolParameter**: Precisely define the parameters and structure of your tools, ensuring proper invocation and data exchange.
+Key features of the graph architecture include:
 
-Trace Visualization
---------------------
-*   **TraceInspector**: Visualize the execution traces of your graphs and agents. The `TraceInspector` helps in understanding complex workflows, identifying bottlenecks, and debugging execution paths through an intuitive representation of traces.
+- **Stateful Execution**: A shared state object is passed between nodes, allowing for seamless data flow and management throughout the graph's execution.
+- **Flexible Control Flow**: Orkes supports both simple, unconditional edges for linear workflows and powerful conditional edges for creating branching logic and loops. This allows you to build dynamic and adaptive systems.
+- **Simple, Pythonic Nodes**: Nodes in an Orkes graph are just plain Python functions, making it easy to integrate your existing code and logic into a graph-based workflow.
+
+Graph Traceability and Visualization
+------------------------------------
+Understanding and debugging complex AI workflows is a major challenge. Orkes addresses this with a built-in traceability and visualization system. When you run a graph, Orkes can generate a detailed execution trace that captures the state, timing, and data flow at every step.
+
+This trace can then be used to generate a self-contained, interactive HTML file that provides a visual representation of the graph's execution. This allows you to:
+
+- **Visualize the execution path**: See exactly which nodes were executed and in what order.
+- **Inspect the state at any point**: Understand how the data in your graph is being transformed.
+- **Debug with ease**: Quickly identify bottlenecks, errors, and unexpected behavior.
+
+Pluggable LLM Integrations
+--------------------------
+Orkes provides a flexible and extensible system for integrating with Large Language Models (LLMs). The ``UniversalLLMClient`` provides a unified interface for interacting with different LLM providers, and the ``LLMFactory`` makes it easy to configure and switch between them.
+
+Out-of-the-box, Orkes includes support for:
+
+- OpenAI-compatible APIs
+- Anthropic's Claude
+- Google's Gemini
+
+You can also easily implement your own custom strategies to connect to any other LLM service or local model.
+
+Agent and Tool Support
+----------------------
+While the graph-based architecture is the core of Orkes, it also provides support for building and using agents and tools. You can define custom tools using the ``OrkesToolSchema`` and use them within your graph's nodes to interact with external APIs, databases, or other services. This allows you to build sophisticated agent-like behaviors within the structured and controllable environment of an Orkes graph.
