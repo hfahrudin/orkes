@@ -1,5 +1,5 @@
 <h2 align="center">
-  <img width="17%" alt="Model2Vec logo" src="assets/orkes.png"><br/>
+  <img width="17%" alt="Orkes logo" src="assets/orkes.png"><br/>
   No abstractions. No black boxes. Just your Agent
 </h2>
 <p align="center">
@@ -71,6 +71,12 @@ print(final_state)
 # 5. Visualize the trace
 runner.visualize_trace("greeting_trace.html")
 ```
+
+Here is an example how the orkes graph visualization will look like:
+
+<h2 align="left">
+  <img width="60%" alt="example" src="assets/inspector-example.png"><br/>
+</h2>
 
 ## Roadmap
 
