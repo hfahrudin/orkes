@@ -13,10 +13,30 @@ How to Use the Tracer
 
 Tracing is enabled by default when you run an Orkes graph. The primary way to interact with the tracer is by visualizing its output.
 
-``orkes_wrapper``
------------------
+``orkes_tracable``
+------------------
 
-The ``orkes_wrapper`` is a decorator that you can apply to your Python functions to make them compatible with the Orkes graph. While it's not strictly for tracing, any function wrapped with it will have its execution (inputs, outputs, and any errors) automatically captured in the trace when it's run as part of a graph.
+The ``orkes_tracable`` is a decorator that you can apply to your Python functions to make them compatible with the Orkes graph. While it's not strictly for tracing, any function wrapped with it will have its execution (inputs, outputs, and any errors) automatically captured in the trace when it's run as part of a graph.
+
+Here is a simple example of how to use it:
+
+.. code-block:: python
+
+   from orkes.graph import orkes_tracable
+
+   @orkes_tracable
+   def my_function(input_1: str, input_2: int) -> dict:
+       """
+       A simple function that processes inputs and returns a dictionary.
+       """
+       # Your function logic here
+       result = {
+           "output_1": f"{input_1}_{input_2}",
+           "output_2": input_2 * 2
+       }
+       return result
+
+When this function is used as a node in an Orkes graph, the tracer will automatically record the values of ``input_1`` and ``input_2``, as well as the dictionary that the function returns (if you use it in the graph). This allows you to inspect the exact inputs and outputs of each function in your graph, which is essential for debugging.
 
 LLM Traces
 ----------
