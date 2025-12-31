@@ -124,24 +124,21 @@ async def test_openai_with_tool_calling_live():
     #         }
     #     }]
     
+    def get_weather(location: str):
+        """
+        Get the current weather in a given location
 
-    orkes_tool = OrkesToolSchema(name="get_weather",
-                                    description="Get the current weather in a given location",
-                                    parameters={
-                                        "type": "object",
-                                        "properties": {
-                                            "location": {
-                                                "type": "string",
-                                                "description": "The city and state, e.g. San Francisco, CA",
-                                            },
-                                        },
-                                        "required": ["location"],
-                                    })
+        Args:
+            location: The city and state, e.g. San Francisco, CA
+        """
+        # Your logic here
+        return f"The weather in {location} is sunny."
+
     
     # actual_tool_payloads = openai_client.provider.get_tools_payload([orkes_tool])
     # assert actual_tool_payloads == tools, "Tool payload schema does not match expected format."
 
-    response = openai_client.send_message(messages, tools=[orkes_tool])
+    response = openai_client.send_message(messages, tools=[get_weather])
     
     result = response['content']
     content_type = result.get("content_type")

@@ -1,13 +1,14 @@
-from typing import Optional, Dict, AsyncGenerator, Any, List
+from typing import Optional, Dict, AsyncGenerator, Any, List, Union, Callable
 import requests
 import json
 import aiohttp
 import asyncio
 from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
-from orkes.services.schema import LLMInterface
+from orkes.services.schema import LLMInterface, OrkesToolSchema
 from orkes.shared.schema import OrkesMessagesSchema
 from orkes.shared.context import edge_trace_var
 from orkes.graph.schema import LLMTraceSchema
+from orkes.shared.utils import callable_to_orkes_tool_schema
 
 class LLMConfig:
     """A universal configuration object for any LLM connection.
@@ -138,7 +139,7 @@ class UniversalLLMClient(LLMInterface):
             settings.update(overrides)
         return settings
 
-    def send_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, connection: Optional[Any] = None, **kwargs) -> Dict:
+    def send_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[list[OrkesToolSchema | Callable]] = None, connection: Optional[Any] = None, **kwargs) -> Dict:
         """Sends a synchronous request to the LLM provider.
 
         Args:
@@ -169,12 +170,21 @@ class UniversalLLMClient(LLMInterface):
         full_url = f"{self.config.base_url}{endpoint}"
 
         settings = self._merge_settings(kwargs)
+        
+        processed_tools = []
+        if tools:
+            for tool in tools:
+                if callable(tool):
+                    processed_tools.append(callable_to_orkes_tool_schema(tool))
+                else:
+                    processed_tools.append(tool)
+
         payload = self.provider.prepare_payload(
             self.config.model,
             messages,
             stream=False,
             settings=settings,
-            tools=tools
+            tools=processed_tools if len(processed_tools) > 0 else None
         )
 
         params = {}
@@ -203,7 +213,7 @@ class UniversalLLMClient(LLMInterface):
         except requests.RequestException as e:
             raise
 
-    async def stream_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[List[Dict]] = None, connection: Optional[Any] = None, **kwargs) -> AsyncGenerator[str, None]:
+    async def stream_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[list[OrkesToolSchema | Callable]] = None, connection: Optional[Any] = None, **kwargs) -> AsyncGenerator[str, None]:
         """Sends an asynchronous request to the LLM provider and streams the response.
 
         Args:
@@ -232,12 +242,20 @@ class UniversalLLMClient(LLMInterface):
 
         full_url = f"{self.config.base_url}{endpoint}"
 
+        processed_tools = []
+        if tools:
+            for tool in tools:
+                if callable(tool):
+                    processed_tools.append(callable_to_orkes_tool_schema(tool))
+                else:
+                    processed_tools.append(tool)
+
         payload = self.provider.prepare_payload(
             self.config.model,
             messages,
             stream=True,
             settings=self._merge_settings(kwargs),
-            tools=tools
+            tools=processed_tools if len(processed_tools) > 0 else None
         )
 
         params = {}

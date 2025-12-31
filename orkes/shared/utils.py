@@ -1,9 +1,82 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 from pydantic import BaseModel
 import datetime
 import ast
 import inspect
 import sys
+from orkes.shared.schema import OrkesToolSchema, ToolParameter
+
+
+def callable_to_orkes_tool_schema(fn: Callable) -> OrkesToolSchema:
+    """
+    Converts a Python function into an OrkesToolSchema.
+
+    This function inspects a callable, extracts its signature and docstring,
+    and constructs an OrkesToolSchema that can be used within the Orkes framework.
+    The docstring is expected to be in a format that includes a main description
+    and an 'Args' section for parameter details.
+
+    Args:
+        fn (Callable): The function to convert.
+
+    Returns:
+        OrkesToolSchema: A schema representing the function as a tool.
+    """
+    signature = inspect.signature(fn)
+    docstring = inspect.getdoc(fn) or ""
+    doc_parts = docstring.split('Args:')
+    description = doc_parts[0].strip()
+    args_description = doc_parts[1].strip() if len(doc_parts) > 1 else ""
+
+    lines = [line.strip() for line in args_description.split('\n')]
+    param_docs = {}
+    for line in lines:
+        if ':' in line:
+            name_part, desc = line.split(':', 1)
+            name = name_part.split('(')[0].strip()
+            param_docs[name] = desc.strip()
+
+    properties = {}
+    required = []
+    type_mapping = {
+        'str': 'string',
+        'int': 'integer',
+        'float': 'number',
+        'bool': 'boolean',
+        'list': 'array',
+        'dict': 'object'
+    }
+
+    for name, param in signature.parameters.items():
+        if name in ('self', 'cls'):
+            continue
+
+        param_type = 'string'  # Default type
+        if param.annotation != inspect.Parameter.empty and hasattr(param.annotation, '__name__'):
+            param_type = type_mapping.get(param.annotation.__name__, 'string')
+
+        properties[name] = {
+            'type': param_type,
+            'description': param_docs.get(name, '')
+        }
+
+        if param.default == inspect.Parameter.empty:
+            required.append(name)
+        else:
+            properties[name]['default'] = param.default
+
+    tool_parameters = ToolParameter(
+        type="object",
+        properties=properties,
+        required=required if required else None
+    )
+
+    return OrkesToolSchema(
+        name=fn.__name__,
+        description=description,
+        parameters=tool_parameters
+    )
+
 
 def format_start_time(start_time: float) -> str:
     """Converts a Unix timestamp to a human-readable 'YYYY-MM-DD HH:MM:SS' format.
