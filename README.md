@@ -25,97 +25,62 @@ You can install the latest stable version of the Orkes using pip:
 pip install orkes
 ```
 
-Here's a simple example of how to build and run a graph with Orkes:
+<details><summary>Here's a simple example of how to build and run a graph with Orkes:</summary>
 
-```python
+```Python
+
 from orkes.graph.core import OrkesGraph
 from typing import TypedDict, List
 
-# 1. Define a simpler state
 class SearchState(TypedDict):
     user_query: str
     search_queries: List[str]
     current_index: int
     raw_results: List[str]
     is_finished: bool
-    final_answer: str
 
-# --- Node 1: Planner (Mocked) ---
 def planner_node(state: SearchState):
-    """Instead of an LLM, we split the query into mock keywords."""
-    print(f"📖 Planning for: {state['user_query']}")
-    
-    # Simple logic: split words as fake 'queries'
-    state['search_queries'] = [f"Search for {word}" for word in state['user_query'].split()[:3]]
+    # Mock planning logic
+    state['search_queries'] = [f"Query {i+1}" for i in range(3)]
     state['current_index'] = 0
-    state['raw_results'] = []
     return state
 
-# --- Node 2: Execution (Mocked) ---
-def execute_search_node(state: SearchState):
+def search_node(state: SearchState):
     idx = state['current_index']
-    query = state['search_queries'][idx]
-    
-    print(f"📡 Executing Step {idx + 1}: {query}")
-    state['raw_results'].append(f"Result for '{query}'")
-    
+    state['raw_results'].append(f"Result for {state['search_queries'][idx]}")
     state['current_index'] += 1
     state['is_finished'] = state['current_index'] >= len(state['search_queries'])
     return state
 
-# --- Node 3: Synthesis (Mocked) ---
 def synthesis_node(state: SearchState):
-    """Combines results into a simple string."""
-    state['final_answer'] = "Combined Results: " + " | ".join(state['raw_results'])
-    print(f"✨ Process Complete: {state['final_answer']}")
+    print(f"Final Output: {', '.join(state['raw_results'])}")
     return state
 
-# --- Router Logic ---
-def check_loop_condition(state: SearchState):
-    return 'complete' if state.get('is_finished') else 'loop'
-
-# --- Build the Graph ---
+# Graph Construction
 graph = OrkesGraph(SearchState)
-
 graph.add_node('planner', planner_node)
-graph.add_node('search_step', execute_search_node)
+graph.add_node('search', search_node)
 graph.add_node('synthesizer', synthesis_node)
 
 graph.add_edge(graph.START, 'planner')
-graph.add_edge('planner', 'search_step')
-
-# Conditional Loop
-graph.add_conditional_edge(
-    'search_step',
-    check_loop_condition,
-    {
-        'loop': 'search_step',   # Go back to search if not finished
-        'complete': 'synthesizer' # Go to finish if done
-    }
+graph.add_edge('planner', 'search')
+graph.add_conditional_edge('search', 
+    lambda s: 'end' if s['is_finished'] else 'loop',
+    {'loop': 'search', 'end': 'synthesizer'}
 )
-
 graph.add_edge('synthesizer', graph.END)
 
-# --- Execute ---
+# Execution
 runner = graph.compile()
-initial_state: SearchState = {
-    "user_query": "Orkes Conductor vs Temporal",
-    "search_queries": [],
-    "current_index": 0,
-    "raw_results": [],
-    "is_finished": False,
-    "final_answer": ""
-}
-
-runner.run(initial_state)
-runner.visualize_trace()
+runner.run({"user_query": "Orkes vs Temporal", "current_index": 0, "raw_results": []})
 ```
+</details>
 
-Here is an example how the orkes graph visualization will look like:
-
-<h2 align="left">
+<details><summary>Here is an example how the orkes graph visualization will look like:</summary>
+<h2 align="center">
   <img width="60%" alt="example" src="assets/inspector-example.png"><br/>
 </h2>
+</details>
 
 ## Core Concepts
 
