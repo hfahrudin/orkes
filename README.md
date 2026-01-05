@@ -16,6 +16,72 @@
 
 Orkes is a Python library for building, coordinating, and observing any complex workflow that can be represented as a graph. While it is well-suited for building LLM-powered agentic systems, its core focus is on providing a flexible and intuitive graph-based framework with an emphasis on explicit control flow, transparent logic, and comprehensive traceability.
 
+
+## Getting Started
+
+You can install the latest stable version of the Orkes using pip:
+
+```cli
+pip install orkes
+```
+
+<details><summary>Here's a simple example of how to build and run a graph with Orkes:</summary>
+
+```Python
+
+from orkes.graph.core import OrkesGraph
+from typing import TypedDict, List
+
+class SearchState(TypedDict):
+    user_query: str
+    search_queries: List[str]
+    current_index: int
+    raw_results: List[str]
+    is_finished: bool
+
+def planner_node(state: SearchState):
+    # Mock planning logic
+    state['search_queries'] = [f"Query {i+1}" for i in range(3)]
+    state['current_index'] = 0
+    return state
+
+def search_node(state: SearchState):
+    idx = state['current_index']
+    state['raw_results'].append(f"Result for {state['search_queries'][idx]}")
+    state['current_index'] += 1
+    state['is_finished'] = state['current_index'] >= len(state['search_queries'])
+    return state
+
+def synthesis_node(state: SearchState):
+    print(f"Final Output: {', '.join(state['raw_results'])}")
+    return state
+
+# Graph Construction
+graph = OrkesGraph(SearchState)
+graph.add_node('planner', planner_node)
+graph.add_node('search', search_node)
+graph.add_node('synthesizer', synthesis_node)
+
+graph.add_edge(graph.START, 'planner')
+graph.add_edge('planner', 'search')
+graph.add_conditional_edge('search', 
+    lambda s: 'end' if s['is_finished'] else 'loop',
+    {'loop': 'search', 'end': 'synthesizer'}
+)
+graph.add_edge('synthesizer', graph.END)
+
+# Execution
+runner = graph.compile()
+runner.run({"user_query": "Orkes vs Temporal", "current_index": 0, "raw_results": []})
+```
+</details>
+
+<details><summary>Here is an example how the orkes graph visualization will look like:</summary>
+<h2 align="center">
+  <img width="60%" alt="example" src="assets/inspector-example.png"><br/>
+</h2>
+</details>
+
 ## Core Concepts
 
 At the heart of Orkes is a powerful graph-based architecture inspired by `NetworkX`. This design allows you to define your workflows as a graph of nodes and edges, where each node is a simple Python function.
@@ -32,51 +98,6 @@ At the heart of Orkes is a powerful graph-based architecture inspired by `Networ
 -   **Agent and Tool Support**: Define custom tools and use them within your graph's nodes to interact with external APIs and services.
 -   **Familiar Interface**: The graph-based interface is inspired by `NetworkX`, providing a familiar and powerful paradigm for those with experience in graph-based programming.
 
-## Getting Started
-
-Here's a simple example of how to build and run a graph with Orkes:
-
-```python
-from typing import TypedDict
-from orkes.graph.core import OrkesGraph
-from orkes.graph.runner import GraphRunner
-
-# 1. Define the state
-class GreetingState(TypedDict):
-    name: str
-    greeting: str
-
-# 2. Create the graph and nodes
-graph = OrkesGraph(GreetingState)
-
-def greeter_node(state: GreetingState) -> GreetingState:
-    state['greeting'] = f"Hello, {state['name']}!"
-    return state
-
-graph.add_node('greeter', greeter_node)
-
-# 3. Connect the nodes with edges
-graph.add_edge(graph.START, 'greeter')
-graph.add_edge('greeter', graph.END)
-
-# 4. Compile and run the graph
-compiled_graph = graph.compile()
-runner = GraphRunner(compiled_graph)
-initial_state = GreetingState(name="World", greeting="")
-final_state = runner.run(initial_state)
-
-print(final_state)
-# Expected output: {'name': 'World', 'greeting': 'Hello, World!'}
-
-# 5. Visualize the trace
-runner.visualize_trace("greeting_trace.html")
-```
-
-Here is an example how the orkes graph visualization will look like:
-
-<h2 align="left">
-  <img width="60%" alt="example" src="assets/inspector-example.png"><br/>
-</h2>
 
 ## Roadmap
 
