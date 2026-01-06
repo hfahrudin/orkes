@@ -94,7 +94,7 @@ class EdgeTrace(BaseModel):
         edge_run_number (int): Sequential number indicating how many times this edge
             has been traversed during the current run.
         from_node (str): Name of the source node where the edge originates.
-        to_node (str): Name of the destination node where the edge terminates.
+        to_node (Union[str, List[str]]): Name of the destination node(s).
         passes_left (int): Remaining number of allowed traversals before the edge
             reaches its maximum pass limit.
         edge_type (str | None): Type of edge (e.g., "__forward__", "__conditional__").
@@ -112,7 +112,7 @@ class EdgeTrace(BaseModel):
     edge_id: str
     edge_run_number: int
     from_node: str
-    to_node: str
+    to_node: Union[str, List[str]]
     passes_left: int
     edge_type: Union[str, None]
     elapsed: float
