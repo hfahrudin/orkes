@@ -181,6 +181,21 @@ class GraphRunner:
 
             next_node = self.nodes_pool[next_node_name].node
             next_edge = self.nodes_pool[next_node_name].edge
+        elif current_edge.edge_type == "__parallel__":
+            if not isinstance(current_node, _StartNode):
+                result = current_node.execute(input_state)
+                self.graph_state.update(result)
+
+            # Recursively traverse each parallel branch
+            for to_node_item in current_edge.to_nodes:
+                branch_start_edge = self.nodes_pool[to_node_item.node.name].edge
+                self.traverse_graph(branch_start_edge, self.graph_state.copy())
+
+            # After all parallel branches are (sequentially) traversed,
+            # the control flow should move to the aggregation node.
+            # The 'next_edge' should be the one coming *out* of the aggregation node.
+            next_node = current_edge.aggregation_node.node
+            next_edge = current_edge.aggregation_node.edge
 
         if not isinstance(next_node, _EndNode):
             next_input = self.graph_state.copy()
@@ -237,6 +252,26 @@ class GraphRunner:
                     next_node = self.nodes_pool[next_node_name].node
                     next_edge = self.nodes_pool[next_node_name].edge
                     edge_trace.to_node = next_node_name
+                elif current_edge.edge_type == "__parallel__":
+                    if not isinstance(current_node, _StartNode):
+                        result = current_node.execute(input_state)
+                        self.graph_state.update(result)
+
+                    # Record the parallel branch starting points in the trace
+                    edge_trace.to_node = [node_item.node.name for node_item in current_edge.to_nodes]
+                    edge_trace.meta["aggregation_node"] = current_edge.aggregation_node.node.name
+
+                    # Recursively traverse each parallel branch
+                    for to_node_item in current_edge.to_nodes:
+                        branch_start_edge = self.nodes_pool[to_node_item.node.name].edge
+                        # Pass a copy of the state to simulate independent branches for tracing,
+                        # but the graph_state itself is shared.
+                        self.traverse_graph(branch_start_edge, self.graph_state.copy())
+
+                    # After all parallel branches are (sequentially) traversed,
+                    # the control flow should move to the aggregation node.
+                    next_node = current_edge.aggregation_node.node
+                    next_edge = current_edge.aggregation_node.edge
             finally:
                 edge_trace_var.reset(edge_trace_token)
 
