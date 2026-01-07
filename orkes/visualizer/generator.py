@@ -134,6 +134,7 @@ class TraceInspector:
                 "label": node_label,
                 "shape": shape,
                 "color": color,
+                "borderRadius": 4, 
             }
             node_data.update(nt)
             nodes.append(node_data)
@@ -172,7 +173,7 @@ class TraceInspector:
                         "from": from_node,
                         "to": to_node,
                         "label": f"{et.get('edge_run_number', '')}",
-                        "dashes": [1,3,10,3], # Distinct dot-dash pattern
+                        "dashes": [10, 5, 2, 5], # Distinct dot-dash pattern
                         "width": width # Default width
                     }
                     edge_data.update(et)
