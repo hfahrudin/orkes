@@ -196,13 +196,6 @@ class OrkesGraph:
             raise ValueError(f"Aggregation node '{aggregation_node}' does not exist.")
         aggregation_node_item = self._nodes_pool[aggregation_node]
 
-        # Check reachability for all parallel branches
-        for to_node_name in to_nodes:
-            if not self.can_reach_node(to_node_name, aggregation_node):
-                raise ValueError(
-                    f"Validation failed: Parallel branch starting at '{to_node_name}' "
-                    f"cannot reach the aggregation node '{aggregation_node}'."
-                )
         
         edge = ParallelEdge(from_node_item, to_node_items, aggregation_node_item, max_passes=max_passes)
         self._edges_pool.append(edge)
@@ -318,6 +311,15 @@ class OrkesGraph:
             if edge.edge_type == "__forward__":
                 if not edge.to_node:
                     raise RuntimeError(f"Edge {edge.id} do not have node destination")
+            elif edge.edge_type == "__parallel__":
+                aggregation_node_name = edge.aggregation_node.node.name
+                for to_node_item in edge.to_nodes:
+                    to_node_name = to_node_item.node.name
+                    if not self.can_reach_node(to_node_name, aggregation_node_name):
+                        raise ValueError(
+                            f"Validation failed: Parallel branch starting at '{to_node_name}' "
+                            f"cannot reach the aggregation node '{aggregation_node_name}'."
+                        )
             # TODO: Add checks for conditional edges.
             elif edge.edge_type == "__conditional__":
                 pass
