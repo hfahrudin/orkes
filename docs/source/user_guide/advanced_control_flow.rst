@@ -102,3 +102,68 @@ You can create loops by routing a conditional edge back to a previous node in th
             'finish': graph.END
         }
     )
+
+4. Parallel Execution (Fan-Out/Fan-In)
+----------------------------------------
+Orkes supports parallel execution of different branches in the graph, a pattern also known as a **fan-out/fan-in** strategy.
+
+- **Fan-Out**: The graph "fans out" from a single node to execute multiple branches concurrently.
+- **Fan-In**: The parallel branches "fan in" to a single aggregation node, ensuring the main execution path only continues after all parallel work is complete.
+
+.. mermaid::
+
+    graph TD
+        subgraph Fan-Out
+            A(start_node) --> B(branch_1);
+            A --> C(branch_2);
+            A --> E(...);
+        end
+        subgraph Fan-In
+            B --> D[aggregation_node];
+            C --> D;
+            E --> D;
+        end
+
+You can implement this using the `add_parallel_edges` method, which splits the execution into multiple paths. All parallel branches must eventually converge into a single `aggregation_node`.
+
+.. code-block:: python
+
+    from orkes.graph.core import OrkesGraph
+    from typing import TypedDict
+
+    class ParallelState(TypedDict):
+        branch_1_visited: bool
+        branch_2_visited: bool
+
+    def branch_1_node(state: ParallelState) -> ParallelState:
+        state['branch_1_visited'] = True
+        return state
+
+    def branch_2_node(state: ParallelState) -> ParallelState:
+        state['branch_2_visited'] = True
+        return state
+
+    def aggregation_node(state: ParallelState) -> ParallelState:
+        # This node will only be reached after both branches complete
+        assert state['branch_1_visited']
+        assert state['branch_2_visited']
+        return state
+
+    graph = OrkesGraph(ParallelState)
+
+    graph.add_node('branch_1', branch_1_node)
+    graph.add_node('branch_2', branch_2_node)
+    graph.add_node('aggregator', aggregation_node)
+
+    graph.add_parallel_edges(
+        graph.START,
+        to_nodes=['branch_1', 'branch_2'],
+        aggregation_node='aggregator'
+    )
+
+    # Edges from parallel branches to the aggregation node
+    graph.add_edge('branch_1', 'aggregator')
+    graph.add_edge('branch_2', 'aggregator')
+
+    # Edge from the aggregation node to the end
+    graph.add_edge('aggregator', graph.END)
