@@ -45,6 +45,7 @@ Units
    Edge
    ForwardEdge
    ConditionalEdge
+   ParallelEdge
 
 Utilities
 ---------
