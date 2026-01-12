@@ -2,9 +2,24 @@ import os
 import sys
 import datetime
 from datetime import datetime
+import re
+from pathlib import Path
 
 # This allows Sphinx to find 'orkes' in the directory above /docs
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# Read the version from pyproject.toml
+pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+pyproject_content = pyproject_path.read_text()
+
+try:
+    version_match = re.search(r'^version\s*=\s*"(.*?)"', pyproject_content, re.M)
+    if version_match is None:
+        raise RuntimeError("Version not found in pyproject.toml")
+    version = version_match.group(1)
+except Exception as e:
+    raise RuntimeError(f"Could not read version from pyproject.toml: {e}") from e
+
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -20,7 +35,6 @@ extensions = [
 # 3. Theme setup
 html_theme = 'pydata_sphinx_theme'
 project = 'orkes'  # This is the text in the header
-version = "0.1.3.2" #INCREMENT THIS
 html_title = f'orkes v{version} documentation' # Appears in the browser tab and header
 
 # To add a logo image (relative to your html_static_path)
