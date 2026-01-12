@@ -20,4 +20,5 @@ Here's what you'll find in this section:
    intro
    features
    examples
+   benchmark
    dev
