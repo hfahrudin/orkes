@@ -31,10 +31,10 @@ Roadmap
      - Planned
    * - Parallel Graph Execution
      - Enhance the graph runner to support parallel execution of independent branches for improved performance.
-     - Planned
+     - Implemented
    * - Tracer Web Platform
      - Develop a standalone web-based platform for visualizing and inspecting graph traces in real-time.
-     - Planned
+     - Progressing
 
 
 

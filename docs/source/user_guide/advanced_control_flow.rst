@@ -103,8 +103,8 @@ You can create loops by routing a conditional edge back to a previous node in th
         }
     )
 
-4. Parallel Execution (Fan-Out/Fan-In)
-----------------------------------------
+4. Parallel Execution
+---------------------
 Orkes supports parallel execution of different branches in the graph, a pattern also known as a **fan-out/fan-in** strategy.
 
 - **Fan-Out**: The graph "fans out" from a single node to execute multiple branches concurrently.
