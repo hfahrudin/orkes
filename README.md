@@ -112,15 +112,17 @@ These preliminary results suggest Orkes can offer a more efficient and performan
 
 ### Results
 
+Example Benchmark Results (*values may vary*):
+
 <details><summary>Basic Benchmark Results</summary>
 <h2 align="center">
-  <img width="70%" alt="Basic Benchmark Results" src="assets/benchmarks/basic_benchmark_results.png"><br/>
+  <img width="80%" alt="Basic Benchmark Results" src="assets/benchmarks/basic_benchmark_results.png"><br/>
 </h2>
 </details>
 
 <details><summary>Statebloat Benchmark Results</summary>
 <h2 align="center">
-  <img width="70%" alt="Statebloat Benchmark Results" src="assets/benchmarks/statebloat_benchmark_results.png"><br/>
+  <img width="80%" alt="Statebloat Benchmark Results" src="assets/benchmarks/statebloat_benchmark_results.png"><br/>
 </h2>
 </details>
 
