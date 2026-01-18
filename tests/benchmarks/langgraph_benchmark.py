@@ -66,9 +66,10 @@ if __name__ == "__main__":
     langgraph_graph_compiled = build_langgraph_graph()
 
     # Time Benchmark
-    start_time = time.time()
+    start = time.perf_counter()
     run_langgraph_benchmark(langgraph_graph_compiled)
-    langgraph_time = time.time() - start_time
+    langgraph_time = time.perf_counter() - start
+
 
     # Memory Benchmark
     langgraph_mem = memory_usage((run_langgraph_benchmark, (langgraph_graph_compiled,)), max_usage=True)

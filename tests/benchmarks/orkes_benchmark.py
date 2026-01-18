@@ -64,9 +64,9 @@ if __name__ == "__main__":
     orkes_graph_compiled = build_orkes_graph()
     
     # Time Benchmark
-    start_time = time.time()
+    start = time.perf_counter()
     run_orkes_benchmark(orkes_graph_compiled)
-    orkes_time = time.time() - start_time
+    orkes_time = time.perf_counter() - start
 
     # Memory Benchmark
     orkes_mem = memory_usage((run_orkes_benchmark, (orkes_graph_compiled,)), max_usage=True)

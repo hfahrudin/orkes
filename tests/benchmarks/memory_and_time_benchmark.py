@@ -2,17 +2,31 @@ import subprocess
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
+import sys
 
 def run_benchmark(script_path):
     """Runs a benchmark script and returns the results."""
+    # Convert string path to a platform-aware Path object
+    p = Path(script_path)
+    
+    # Use sys.executable to ensure the same Python interpreter is used
+    # shell=True is sometimes needed on Windows for certain PATH resolutions, 
+    # but sys.executable usually bypasses that need.
     result = subprocess.run(
-        ['python', script_path],
+        [sys.executable, str(p)],
         capture_output=True,
         text=True
     )
+    
     if result.returncode != 0:
         raise RuntimeError(f"Error running {script_path}:\n{result.stderr}")
-    return json.loads(result.stdout)
+    
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Failed to parse JSON from {script_path}. Output: {result.stdout}")
+
 
 if __name__ == "__main__":
     # Run benchmarks in separate processes
