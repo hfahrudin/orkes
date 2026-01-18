@@ -30,8 +30,13 @@ def run_benchmark(script_path):
 
 if __name__ == "__main__":
     # Run benchmarks in separate processes
-    orkes_results = run_benchmark('tests/benchmarks/orkes_benchmark.py')
-    langgraph_results = run_benchmark('tests/benchmarks/langgraph_benchmark.py')
+    # Construct paths relative to the current script's directory
+    script_dir = Path(__file__).parent
+    orkes_benchmark_path = script_dir / 'orkes_test.py'
+    langgraph_benchmark_path = script_dir / 'langgraph_test.py'
+
+    orkes_results = run_benchmark(str(orkes_benchmark_path))
+    langgraph_results = run_benchmark(str(langgraph_benchmark_path))
 
     orkes_time = orkes_results['time']
     orkes_mem = orkes_results['memory']
@@ -75,5 +80,8 @@ if __name__ == "__main__":
     ax2.legend()
 
     fig.tight_layout()
-    plt.savefig('tests/benchmarks/results/benchmark_results.png')
-    print("\nBenchmark plot saved to 'tests/benchmarks/results/benchmark_results.png'")
+    # Ensure the results directory exists relative to the benchmarks root
+    results_dir = script_dir.parent / 'results'
+    results_dir.mkdir(exist_ok=True)
+    plt.savefig(results_dir / 'basic_benchmark_results.png')
+    print(f"\nBenchmark plot saved to '{results_dir / 'basic_benchmark_results.png'}'")
