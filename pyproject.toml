@@ -43,6 +43,9 @@ docs = [
 "Homepage" = "https://github.com/hfahrudin/orkes"
 "Documentation" = "https://orkes.readthedocs.io/" 
 
+[project.scripts]
+orkes = "orkes.cli:main"
+
 [tool.setuptools]
 # This automatically finds orkes, orkes.shared, orkes.graph, etc.
 packages = { find = { where = ["."], include = ["orkes*"] } }
