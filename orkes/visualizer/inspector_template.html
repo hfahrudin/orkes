@@ -83,6 +83,45 @@
             transition: height 0.2s ease-in-out;
         }
 
+        #legend-card {
+            position: absolute; bottom: 20px; left: 20px; width: 250px;
+            background: #ffffff; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column-reverse;
+            border: 1px solid #ccc; z-index: 1000;
+            overflow: hidden;
+        }
+
+        #legend-card.minimized #legend-content-wrapper {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        #legend-header {
+            padding: 10px 15px; cursor: move; background: #343a40; color: white;
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none; flex-shrink: 0;
+        }
+
+        #legend-content-wrapper {
+            padding: 15px;
+            overflow-y: auto;
+            max-height: 500px; /* Initial large value for expansion */
+            opacity: 1;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out;
+        }
+        
+        .legend-item { display: flex; align-items: center; margin-bottom: 10px; }
+        .legend-symbol { width: 30px; margin-right: 10px; text-align: center; }
+        .legend-text { font-size: 14px; }
+        .legend-line { border-top-width: 2px; border-top-style: solid; }
+        .legend-line.dashed { border-top-style: dashed; }
+        .legend-line.dash-dot {
+            border-top-style: dashed;
+            border-image: repeating-linear-gradient(90deg, currentColor, currentColor 10px, transparent 10px, transparent 12px, currentColor 12px, currentColor 14px, transparent 14px, transparent 16px) 1;
+        }
+
         /* Minimized State */
         #inspector.minimized {
             height: 42px !important; /* Only header height */
@@ -188,6 +227,38 @@
             <div id="content">Click a Node or an Edge to view details.</div>
         </div>
     </div>
+    
+    <div id="legend-card">
+        <div id="legend-header">
+            <span>Legend</span>
+            <button class="min-btn" onclick="toggleLegend()" title="Minimize/Maximize">&minus;</button>
+        </div>
+        <div id="legend-content-wrapper">
+            <h5>Node Shapes</h5>
+            <div class="legend-item">
+                <div class="legend-symbol"><svg width="20" height="20"><rect x="2" y="2" width="16" height="16" rx="4" fill="#d2e5ff" stroke="#2b7ce9"></rect></svg></div>
+                <div class="legend-text">Standard Node</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol"><svg width="20" height="20"><ellipse cx="10" cy="10" rx="10" ry="7" fill="#d2e5ff" stroke="#2b7ce9"></ellipse></svg></div>
+                <div class="legend-text">Start/End Node</div>
+            </div>
+            <h5>Line Categories</h5>
+            <div class="legend-item">
+                <div class="legend-symbol"><div class="legend-line"></div></div>
+                <div class="legend-text">Forward</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol"><div class="legend-line dashed"></div></div>
+                <div class="legend-text">Conditional</div>
+            </div>
+             <div class="legend-item">
+                <div class="legend-symbol"><div class="legend-line dash-dot"></div></div>
+                <div class="legend-text">Parallel</div>
+            </div>
+        </div>
+    </div>
+
 
     <script type="text/javascript">
         const nodes = new vis.DataSet(JSON_NODES);
@@ -205,7 +276,7 @@
 
         function toggleMinimize() {
             const insp = document.getElementById('inspector');
-            const btn = document.querySelector('.min-btn');
+            const btn = insp.querySelector('.min-btn');
             if (!isMinimized) {
                 originalHeight = insp.style.height || "600px";
                 insp.classList.add('minimized');
@@ -218,6 +289,20 @@
             isMinimized = !isMinimized;
         }
 
+        // Toggle Legend Minimize
+        let isLegendMinimized = false;
+        function toggleLegend() {
+            const legend = document.getElementById('legend-card');
+            const btn = legend.querySelector('.min-btn');
+            legend.classList.toggle('minimized');
+            if (legend.classList.contains('minimized')) {
+                btn.innerHTML = "&#43;";
+            } else {
+                btn.innerHTML = "&minus;";
+            }
+            isLegendMinimized = !isLegendMinimized;
+        }
+        
         function toggleCollapse(header) {
             header.classList.toggle("active");
             const content = header.nextElementSibling;
@@ -338,9 +423,12 @@
 
         // Drag Logic
         dragElement(document.getElementById("inspector"));
+        dragElement(document.getElementById("legend-card"));
         function dragElement(elmnt) {
             var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-            document.getElementById("inspector-header").onmousedown = function(e) {
+            const header = elmnt.querySelector(`#${elmnt.id}-header`);
+            if (!header) return; // Ensure header exists
+            header.onmousedown = function(e) {
                 e = e || window.event;
                 if (e.target.className === 'min-btn') return; // Don't drag if clicking button
                 e.preventDefault();
@@ -349,9 +437,20 @@
                 document.onmousemove = (e) => {
                     pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY;
                     pos3 = e.clientX; pos4 = e.clientY;
-                    elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
-                    elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
-                    elmnt.style.right = 'auto'; elmnt.style.bottom = 'auto';
+
+                    if (elmnt.id === 'legend-card') {
+                        // For legend card, adjust bottom and left
+                        elmnt.style.bottom = (window.innerHeight - elmnt.offsetHeight - elmnt.offsetTop + pos2) + "px";
+                        elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+                        elmnt.style.right = 'auto'; // Reset right
+                        elmnt.style.top = 'auto'; // Reset top
+                    } else {
+                        // For inspector, adjust top and left
+                        elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+                        elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+                        elmnt.style.right = 'auto'; // Reset right
+                        elmnt.style.bottom = 'auto'; // Reset bottom
+                    }
                 };
             };
         }

@@ -1,6 +1,6 @@
 from typing import Callable, Union, Dict, List
 from orkes.graph.utils import function_assertion, is_typeddict_class
-from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode
+from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode, ParallelEdge
 from orkes.graph.schema import NodePoolItem
 from orkes.graph.runner import GraphRunner
 import uuid
@@ -160,6 +160,48 @@ class OrkesGraph:
         if "END" in condition.values():
             self._nodes_pool["END"].edge = "<END GRAPH TOKEN>"
 
+    def add_parallel_edges(self, from_node: Union[str, _StartNode], to_nodes: List[str], aggregation_node: str, max_passes: int = 25):
+        """Adds a parallel edge that splits into multiple branches.
+
+        This creates parallel execution paths starting from each node in `to_nodes`.
+        It enforces that all parallel branches must be able to reach the specified
+        `aggregation_node`.
+
+        Args:
+            from_node (Union[str, _StartNode]): The node from which the parallel branches originate.
+            to_nodes (List[str]): A list of node names, where each name is the start of a parallel branch.
+            aggregation_node (str): The name of the node where all parallel branches must eventually converge.
+            max_passes (int, optional): The maximum number of times this edge can be traversed. Defaults to 25.
+
+        Raises:
+            RuntimeError: If the graph has been compiled.
+            ValueError: If any of the provided node names do not exist, or if a parallel
+                        branch cannot reach the aggregation node.
+        """
+        if self._freeze:
+            raise RuntimeError("Cannot modify after compile")
+
+        # Validate from_node
+        from_node_item = self._validate_from_node(from_node)
+
+        # Validate to_nodes
+        to_node_items = []
+        for to_node_name in to_nodes:
+            if to_node_name not in self._nodes_pool:
+                raise ValueError(f"To node '{to_node_name}' in to_nodes does not exist.")
+            to_node_items.append(self._nodes_pool[to_node_name])
+        
+        # Validate aggregation_node
+        if aggregation_node not in self._nodes_pool:
+            raise ValueError(f"Aggregation node '{aggregation_node}' does not exist.")
+        aggregation_node_item = self._nodes_pool[aggregation_node]
+
+        
+        edge = ParallelEdge(from_node_item, to_node_items, aggregation_node_item, max_passes=max_passes)
+        self._edges_pool.append(edge)
+        self._nodes_pool[from_node_item.node.name].edge = edge
+
+
     def _validate_condition(self, condition: Dict[str, Union[str, Node]]):
         """Validates the condition dictionary for a conditional edge.
 
@@ -269,6 +311,15 @@ class OrkesGraph:
             if edge.edge_type == "__forward__":
                 if not edge.to_node:
                     raise RuntimeError(f"Edge {edge.id} do not have node destination")
+            elif edge.edge_type == "__parallel__":
+                aggregation_node_name = edge.aggregation_node.node.name
+                for to_node_item in edge.to_nodes:
+                    to_node_name = to_node_item.node.name
+                    if not self.can_reach_node(to_node_name, aggregation_node_name):
+                        raise ValueError(
+                            f"Validation failed: Parallel branch starting at '{to_node_name}' "
+                            f"cannot reach the aggregation node '{aggregation_node_name}'."
+                        )
             # TODO: Add checks for conditional edges.
             elif edge.edge_type == "__conditional__":
                 pass
@@ -317,4 +368,68 @@ class OrkesGraph:
                 return True
 
         path.remove(current_node_name)
+        return False
+    
+    def can_reach_node(self, start_node_name: str, target_node_name: str) -> bool:
+        """Determines if the target node is reachable from the start node.
+
+        Args:
+            start_node_name (str): The name of the starting node.
+            target_node_name (str): The name of the target node.
+
+        Returns:
+            bool: True if the target node is reachable, False otherwise.
+
+        Raises:
+            ValueError: If start_node_name or target_node_name do not exist.
+        """
+        if start_node_name not in self._nodes_pool:
+            raise ValueError(f"Start node '{start_node_name}' does not exist.")
+        if target_node_name not in self._nodes_pool:
+            raise ValueError(f"Target node '{target_node_name}' does not exist.")
+
+        visited = set()
+        start_node_item = self._nodes_pool[start_node_name]
+        return self._dfs_can_reach(start_node_item, target_node_name, visited)
+
+    def _dfs_can_reach(self, current_node_item: NodePoolItem, target_node_name: str, visited: set) -> bool:
+        """Helper method for DFS to check if target node is reachable.
+
+        Args:
+            current_node_item (NodePoolItem): The current node being visited.
+            target_node_name (str): The name of the target node.
+            visited (set): A set of names of visited nodes to prevent cycles.
+
+        Returns:
+            bool: True if the target node is reachable, False otherwise.
+        """
+        current_node_name = current_node_item.node.name
+
+        if current_node_name == target_node_name:
+            return True
+
+        if current_node_name in visited:
+            return False
+
+        visited.add(current_node_name)
+
+        edge = current_node_item.edge
+        if edge is None:
+            return False
+
+        if isinstance(edge, ForwardEdge):
+            next_node_item = edge.to_node
+            if next_node_item and self._dfs_can_reach(next_node_item, target_node_name, visited):
+                return True
+        elif isinstance(edge, ConditionalEdge):
+            for next_node_name_from_condition in edge.condition.values():
+                # Conditional edges can point to node names as strings
+                if next_node_name_from_condition in self._nodes_pool:
+                    next_node_item = self._nodes_pool[next_node_name_from_condition]
+                    if self._dfs_can_reach(next_node_item, target_node_name, visited):
+                        return True
+        elif isinstance(edge, ParallelEdge):
+            for next_node_item in edge.to_nodes:
+                if self._dfs_can_reach(next_node_item, target_node_name, visited):
+                    return True
         return False

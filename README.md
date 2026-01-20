@@ -136,13 +136,46 @@ At the heart of Orkes is a powerful graph-based architecture inspired by `Networ
 -   **Familiar Interface**: The graph-based interface is inspired by `NetworkX`, providing a familiar and powerful paradigm for those with experience in graph-based programming.
 
 
+## Benchmarks
+
+Orkes has been benchmarked against LangGraph on simple graph structures, demonstrating performance advantages. In direct comparisons of graphs with identical nodes and edges, Orkes consistently outperforms LangGraph in both latency and memory utilization.
+
+### Key Findings
+
+*   For a simple graph comprising 5 nodes, Orkes exhibits up to a 5x increase in speed and consumes up to 2x less memory compared to LangGraph.
+*   When scaled to a 10-node graph, Orkes's performance gap widens, achieving up to 10x faster execution and using up to 3x less memory than LangGraph.
+
+These preliminary results suggest Orkes can offer a more efficient and performant solution for developing and deploying LLM applications, particularly in scenarios involving graph-based workflows.
+
+### Results
+
+Example Benchmark Results (*values may vary*):
+
+<details><summary>Basic Benchmark Results</summary>
+<h2 align="center">
+  <img width="80%" alt="Basic Benchmark Results" src="assets/benchmarks/basic_benchmark_results.png"><br/>
+</h2>
+</details>
+
+<details><summary>Statebloat Benchmark Results</summary>
+<h2 align="center">
+  <img width="80%" alt="Statebloat Benchmark Results" src="assets/benchmarks/statebloat_benchmark_results.png"><br/>
+</h2>
+</details>
+
+To replicate or run the benchmarks, navigate to the `tests/benchmarks` directory and execute the `run_all_benchmarks.py` script:
+
+```bash
+python tests/benchmarks/run_all_benchmarks.py
+```
+
 ## Roadmap
 
 | Feature                  | Description                                                                                                     | Status  |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------- |
 | Boilerplate Agent        | Provide a well-structured boilerplate for creating new agents to accelerate the development of agentic systems. | Planned |
-| Parallel Graph Execution | Enhance the graph runner to support parallel execution of independent branches for improved performance.        | Planned |
-| Tracer Web Platform      | Develop a standalone web-based platform for visualizing and inspecting graph traces in real-time.               | Planned |
+| Parallel Graph Execution | Enhance the graph runner to support parallel execution of independent branches for improved performance.        | Implemented |
+| Tracer Web Platform      | Develop a standalone web-based platform for visualizing and inspecting graph traces in real-time.               | Progressing |
 
 ## Documentation
 For more details, visit our [Documentation Page](https://orkes.readthedocs.io/).

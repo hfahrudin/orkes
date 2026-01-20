@@ -207,4 +207,36 @@ class ConditionalEdge(Edge):
             }
         )
 
+class ParallelEdge(Edge):
+    """An edge that creates multiple parallel branches of execution.
+
+    Each branch starts from a node in `to_nodes`. All branches are expected
+    to eventually converge at the `aggregation_node`.
+    """
+    def __init__(self, from_node: NodePoolItem, to_nodes: list[NodePoolItem], aggregation_node: NodePoolItem, max_passes: int = 25):
+        """Initializes a ParallelEdge.
+
+        Args:
+            from_node (NodePoolItem): The node from which the edge originates.
+            to_nodes (list[NodePoolItem]): A list of nodes where each parallel branch starts.
+            aggregation_node (NodePoolItem): The node where all parallel branches are expected to converge.
+            max_passes (int, optional): The maximum number of times this edge can be traversed. Defaults to 25.
+        """
+        super().__init__(from_node, to_node=None, max_passes=max_passes)
+        self.to_nodes = to_nodes
+        self.aggregation_node = aggregation_node
+        self.edge_type = "__parallel__"
+        self.edge_trace = EdgeTrace(
+            edge_id=self.id,
+            edge_run_number=0,
+            from_node=self.from_node.node.name,
+            to_node=[node.node.name for node in self.to_nodes],
+            passes_left=self.max_passes,
+            edge_type=self.edge_type,
+            elapsed=0.0,
+            meta={
+                "type": "parallel_edge",
+                "aggregation_node": self.aggregation_node.node.name
+            })
+
 NodePoolItem.model_rebuild()

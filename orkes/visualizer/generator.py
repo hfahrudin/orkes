@@ -134,6 +134,7 @@ class TraceInspector:
                 "label": node_label,
                 "shape": shape,
                 "color": color,
+                "borderRadius": 4, 
             }
             node_data.update(nt)
             nodes.append(node_data)
@@ -155,20 +156,38 @@ class TraceInspector:
             edge_type = edge_meta.get('type', 'forward_edge')
 
             dashes: Union[bool, List[int]] = False
+            width = 0.5 # Revert to default width
+            
             if edge_type == 'conditional_edge':
-                dashes = [5, 5]
+                dashes = [5, 3] # More prominent dashes
             
             et["elapsed"] = format_elapsed_time(et["elapsed"])
 
-            edge_data = {
-                "from": et.pop('from_node'),
-                "to": et.pop('to_node'),
-                "label": f"{et.get('edge_run_number', '')}",
-                "dashes": dashes,
-                "width": 0.5
-            }
-            edge_data.update(et)
-            edges.append(edge_data)
+            from_node = et.pop('from_node')
+            to_nodes = et.pop('to_node')
+            
+            # Handle parallel edges where to_nodes is a list
+            if isinstance(to_nodes, list):
+                for to_node in to_nodes:
+                    edge_data = {
+                        "from": from_node,
+                        "to": to_node,
+                        "label": f"{et.get('edge_run_number', '')}",
+                        "dashes": [10, 5, 2, 5], # Distinct dot-dash pattern
+                        "width": width # Default width
+                    }
+                    edge_data.update(et)
+                    edges.append(edge_data)
+            else: # Standard forward or conditional edge
+                edge_data = {
+                    "from": from_node,
+                    "to": to_nodes,
+                    "label": f"{et.get('edge_run_number', '')}",
+                    "dashes": dashes,
+                    "width": width
+                }
+                edge_data.update(et)
+                edges.append(edge_data)
         return edges
 
     def generate_html(self, trace_data: Union[str, Dict]) -> str:

@@ -15,3 +15,5 @@ docs/_build/
 docs/build/
 docs/source/api
 .DS_STORE
+build/
+tests/benchmarks/results
