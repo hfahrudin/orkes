@@ -1,0 +1,150 @@
+body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: #f0f2f5;
+    display: flex;
+    flex-direction: column; /* Ensure header is on top, then main content */
+}
+
+/* General Layout */
+#main-content {
+    flex-grow: 1; /* Take up remaining vertical space */
+    padding: 20px 40px; /* Increased horizontal padding */
+    overflow-y: auto;
+}
+
+/* Card Styling (reused from inspector) */
+.card {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border: 1px solid #e1e4e8;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 10px 15px;
+    background: #343a40;
+    color: white;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+
+.card-body {
+    padding: 15px;
+}
+
+/* Table Styling */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.data-table th, .data-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e1e4e8;
+}
+
+.data-table th {
+    background-color: #f8f9fa;
+    color: #343a40;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.85em;
+}
+
+.data-table tr:hover {
+    background-color: #f1f8ff;
+}
+
+/* Scrollbar for content areas */
+#main-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+#main-content::-webkit-scrollbar-track {
+    background: #f0f2f5;
+}
+
+#main-content::-webkit-scrollbar-thumb {
+    background: #cccccc;
+    border-radius: 4px;
+}
+
+#main-content::-webkit-scrollbar-thumb:hover {
+    background: #aaaaaa;
+}
+
+/* Main Header Styling */
+#main-header {
+    display: flex;
+    justify-content: space-between; /* Pushes header-left and header-right to opposite ends */
+    align-items: center;
+    padding: 10px 40px; /* Horizontal padding */
+    background-color: #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    border-bottom: 1px solid #e1e4e8;
+    flex-shrink: 0;
+}
+
+.header-left .header-logo {
+    height: 44px; /* Increased by 10% from 40px */
+    vertical-align: middle;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    flex-grow: 1; /* Allow header-right to take available space */
+    justify-content: space-between; /* Pushes main-nav-links to left, external-links to right */
+    margin-left: 30px; /* Space between header-left and header-right */
+}
+
+.header-right a {
+    /* Removed margin-left: 20px; as gap will handle spacing */
+    text-decoration: none;
+    color: #343a40;
+    font-weight: 500;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.header-right a:hover {
+    color: #007bff;
+}
+
+.header-right a .icon {
+    margin-right: 8px;
+    font-size: 1.1em;
+}
+
+.header-right .separator {
+    margin: 0 15px;
+    color: #ccc;
+}
+
+.main-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 20px; /* Space between main navigation items */
+}
+
+.external-links {
+    display: flex;
+    align-items: center;
+    gap: 20px; /* Space between external links */
+}
+
+/* This is the new rule for the external links icons */
+.external-links a .icon {
+    font-size: 1.5em; /* Increased size for external links icons */
+}
