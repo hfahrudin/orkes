@@ -15,7 +15,10 @@ authors = [
 ]
 dependencies = [
   "pydantic>=2.0",
-  "aiohttp"
+  "aiohttp",
+  "click",
+  "fastapi",
+  "uvicorn"
 ]
 
 [project.optional-dependencies]
