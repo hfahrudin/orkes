@@ -31,6 +31,30 @@ def create_app():
         with open(index_html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
 
+    @app.get("/dashboard", response_class=HTMLResponse)
+    async def read_dashboard():
+        dashboard_html_path = templates_dir / "dashboard.html"
+        if not dashboard_html_path.exists():
+            return HTMLResponse(content="<h1>dashboard.html not found!</h1>", status_code=404)
+        with open(dashboard_html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+
+    @app.get("/settings", response_class=HTMLResponse)
+    async def read_settings():
+        settings_html_path = templates_dir / "settings.html"
+        if not settings_html_path.exists():
+            return HTMLResponse(content="<h1>settings.html not found!</h1>", status_code=404)
+        with open(settings_html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+
+    @app.get("/traces", response_class=HTMLResponse)
+    async def read_traces():
+        traces_html_path = templates_dir / "traces.html"
+        if not traces_html_path.exists():
+            return HTMLResponse(content="<h1>traces.html not found!</h1>", status_code=404)
+        with open(traces_html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+
     return app
 
 if __name__ == "__main__":
