@@ -7,6 +7,39 @@
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/favicon.png" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        #main-content {
+            display: flex;
+        }
+        .sidebar {
+            width: 200px;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-right: 1px solid #ddd;
+        }
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar-menu-item {
+            margin-bottom: 10px;
+        }
+        .sidebar-menu-item a {
+            text-decoration: none;
+            color: #333;
+            display: block;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .sidebar-menu-item a.active, .sidebar-menu-item a:hover {
+            background-color: #ddd;
+        }
+        .content {
+            flex-grow: 1;
+            padding: 20px;
+        }
+    </style>
 </head>
 <body>
     <header id="main-header">
@@ -28,15 +61,62 @@
         </nav>
     </header>
     <div id="main-content">
-        <div class="card">
-            <div class="card-header">
-                Settings
+        <div class="sidebar">
+            <ul class="sidebar-menu">
+                <li class="sidebar-menu-item"><a href="#" class="active" onclick="showContent('general')">General</a></li>
+                <li class="sidebar-menu-item"><a href="#" onclick="showContent('root')">Root</a></li>
+            </ul>
+        </div>
+        <div class="content">
+            <div id="general-content">
+                <div class="card">
+                    <div class="card-header">
+                        General Settings
+                    </div>
+                    <div class="card-body">
+                        <p>General settings content goes here.</p>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <!-- Settings form will go here -->
-                <p>Settings page content goes here.</p>
+            <div id="root-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        Root Folder
+                    </div>
+                    <div class="card-body">
+                        <label for="root_folder_path">Selected Folder:</label>
+                        <input type="text" id="root_folder_path" name="root_folder_path" value="/Users/yunintias/Documents/Kerja/orkes" readonly>
+                        <input type="file" id="folder_picker" webkitdirectory directory style="display: none;">
+                        <button onclick="document.getElementById('folder_picker').click()">Select Folder</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+    <script>
+        function showContent(contentType) {
+            document.getElementById('general-content').style.display = 'none';
+            document.getElementById('root-content').style.display = 'none';
+            document.getElementById(contentType + '-content').style.display = 'block';
+
+            document.querySelectorAll('.sidebar-menu-item a').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`.sidebar-menu-item a[onclick="showContent('${contentType}')"]`).classList.add('active');
+        }
+
+        const folderPicker = document.getElementById('folder_picker');
+        const rootFolderPathInput = document.getElementById('root_folder_path');
+
+        folderPicker.addEventListener('change', (event) => {
+            const files = event.target.files;
+            if (files.length > 0) {
+                // The path of the first file will give us the directory path
+                const fullPath = files[0].webkitRelativePath;
+                const directoryPath = fullPath.substring(0, fullPath.indexOf('/'));
+                rootFolderPathInput.value = directoryPath;
+            }
+        });
+    </script>
 </body>
 </html>

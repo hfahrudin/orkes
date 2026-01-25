@@ -33,7 +33,7 @@ def create_app():
 
     @app.get("/dashboard", response_class=HTMLResponse)
     async def read_dashboard():
-        dashboard_html_path = templates_dir / "dashboard.html"
+        dashboard_html_path = templates_dir / "dashboard"
         if not dashboard_html_path.exists():
             return HTMLResponse(content="<h1>dashboard.html not found!</h1>", status_code=404)
         with open(dashboard_html_path, "r", encoding="utf-8") as f:
