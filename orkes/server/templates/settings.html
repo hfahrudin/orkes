@@ -212,7 +212,8 @@
                 
                 data.directories.forEach(dir => {
                     const li = document.createElement('li');
-                    li.innerHTML = `<a href="#" data-path="${dir}"><i class="fa-solid fa-folder"></i> ${dir.substring(dir.lastIndexOf('/') + 1)}</a>`;
+                    const displayName = dir.split('/').pop();
+                    li.innerHTML = `<a href="#" data-path="${dir}"><i class="fa-solid fa-folder"></i> ${displayName}</a>`;
                     directoryList.appendChild(li);
                 });
 

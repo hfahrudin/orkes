@@ -58,8 +58,9 @@ def create_app():
     @app.get("/api/list-directories", response_class=JSONResponse)
     async def list_directories(path: str = "."):
         try:
-            base_path = app_settings.get("root_folder") or "."
+            base_path =  "."
             base_path_abs = os.path.abspath(base_path)
+
 
             # If the provided path is ".", use the base path. Otherwise, resolve the provided path.
             if path == ".":
@@ -69,7 +70,6 @@ def create_app():
                 # We resolve the path sent by the client relative to the base path
                 # to ensure it's a sub-directory
                 resolved_path = os.path.abspath(os.path.join(base_path_abs, path))
-
             # Security check to prevent directory traversal
             if not resolved_path.startswith(base_path_abs):
                 return JSONResponse(content={"error": "Access denied."}, status_code=403)
