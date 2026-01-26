@@ -39,6 +39,51 @@
             flex-grow: 1;
             padding: 20px;
         }
+        /* New styles for directory listing */
+        #directory_list {
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+            border: 1px solid #eee;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+        #directory_list li {
+            padding: 8px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        #directory_list li:last-child {
+            border-bottom: none;
+        }
+        #directory_list li:hover {
+            background-color: #f9f9f9;
+        }
+        #directory_list li a {
+            text-decoration: none;
+            color: #555;
+            display: block;
+        }
+        #directory_list li a:hover {
+            color: #007bff;
+        }
+        .message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
     </style>
 </head>
 <body>
@@ -84,17 +129,32 @@
                         Root Folder
                     </div>
                     <div class="card-body">
-                        <label for="root_folder_path">Selected Folder:</label>
-                        <input type="text" id="root_folder_path" name="root_folder_path" value="/Users/yunintias/Documents/Kerja/orkes" readonly>
-                        <input type="file" id="folder_picker" webkitdirectory directory style="display: none;">
-                        <button onclick="document.getElementById('folder_picker').click()">Select Folder</button>
+                        <div>
+                            Current Path: <span id="current_path">.</span>
+                        </div>
+                        <ul id="directory_list">
+                            <!-- Directory list will be populated by JavaScript -->
+                        </ul>
+                        <button id="save_root_folder">Save</button>
+                        <div id="message_area" class="message" style="display: none;"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     <script>
-        function showContent(contentType) {
+        let selectedPath = "."; // Initialize with a default value
+
+        function showMessage(msg, type) {
+            messageArea.textContent = msg;
+            messageArea.className = `message ${type}`;
+            messageArea.style.display = 'block';
+            setTimeout(() => {
+                messageArea.style.display = 'none';
+            }, 3000);
+        }
+
+        async function showContent(contentType) {
             document.getElementById('general-content').style.display = 'none';
             document.getElementById('root-content').style.display = 'none';
             document.getElementById(contentType + '-content').style.display = 'block';
@@ -103,18 +163,111 @@
                 item.classList.remove('active');
             });
             document.querySelector(`.sidebar-menu-item a[onclick="showContent('${contentType}')"]`).classList.add('active');
+
+            if (contentType === 'root') {
+                await fetchCurrentRootFolder();
+                fetchDirectories(selectedPath);
+            }
         }
 
-        const folderPicker = document.getElementById('folder_picker');
-        const rootFolderPathInput = document.getElementById('root_folder_path');
+        async function fetchCurrentRootFolder() {
+            try {
+                const response = await fetch('/api/settings/root-folder');
+                const data = await response.json();
+                if (data.root_folder) {
+                    selectedPath = data.root_folder;
+                    currentPathSpan.textContent = selectedPath;
+                }
+            } catch (error) {
+                console.error("Error fetching current root folder:", error);
+                showMessage("Error fetching current root folder.", 'error');
+            }
+        }
 
-        folderPicker.addEventListener('change', (event) => {
-            const files = event.target.files;
-            if (files.length > 0) {
-                // The path of the first file will give us the directory path
-                const fullPath = files[0].webkitRelativePath;
-                const directoryPath = fullPath.substring(0, fullPath.indexOf('/'));
-                rootFolderPathInput.value = directoryPath;
+        const directoryList = document.getElementById('directory_list');
+        const currentPathSpan = document.getElementById('current_path');
+        const saveButton = document.getElementById('save_root_folder');
+        const messageArea = document.getElementById('message_area');
+
+        async function fetchDirectories(path) {
+            try {
+                const response = await fetch(`/api/list-directories?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                if (data.error) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+                
+                directoryList.innerHTML = "";
+                currentPathSpan.textContent = path;
+                selectedPath = path;
+
+                // Add ".." for navigating up
+                if (path !== "." && path !== "" && path !== "/") {
+                    const parentPath = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '.';
+                    const upLink = document.createElement('li');
+                    upLink.innerHTML = `<a href="#" data-path="${parentPath}"><i class="fa-solid fa-folder"></i> ..</a>`;
+                    directoryList.appendChild(upLink);
+                }
+                
+                data.directories.forEach(dir => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<a href="#" data-path="${dir}"><i class="fa-solid fa-folder"></i> ${dir.substring(dir.lastIndexOf('/') + 1)}</a>`;
+                    directoryList.appendChild(li);
+                });
+
+            } catch (error) {
+                console.error("Error fetching directories:", error);
+                showMessage("Error fetching directories.", 'error');
+            }
+        }
+        
+        directoryList.addEventListener('click', (event) => {
+            if (event.target.tagName === 'A' || event.target.closest('a')) {
+                event.preventDefault();
+                const targetAnchor = event.target.tagName === 'A' ? event.target : event.target.closest('a');
+                if (targetAnchor) {
+                    const newPath = targetAnchor.getAttribute('data-path');
+                    fetchDirectories(newPath);
+                }
+            }
+        });
+
+        saveButton.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/settings/root-folder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ root_folder: selectedPath })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showMessage('Root folder saved successfully!', 'success');
+                } else {
+                    showMessage('Error saving root folder.', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving root folder:', error);
+                showMessage('Error saving root folder.', 'error');
+            }
+        });
+
+        // Initial fetch when the page loads (in case the root tab is the default or first shown)
+        // Or, more accurately, when the 'root' tab is made active initially if not default.
+        // For now, let's assume showContent('root') will be called when the user navigates.
+        // If 'root' is the initial active tab, then call it here:
+        // showContent('root'); // Uncomment if 'root' is the initial active tab.
+        
+        // As per the original structure, general is active initially, so this will be called on click.
+        // However, we need to ensure initial selectedPath is correct when "Root" is first displayed.
+        // So we will call fetchCurrentRootFolder when the page loads, and then fetchDirectories based on that.
+        document.addEventListener('DOMContentLoaded', async () => {
+            await fetchCurrentRootFolder();
+            // Only fetch directories if the root content is displayed, or ensure initial selectedPath is used for first display
+            if (document.getElementById('root-content').style.display === 'block') {
+                 fetchDirectories(selectedPath);
             }
         });
     </script>
