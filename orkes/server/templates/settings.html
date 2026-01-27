@@ -126,7 +126,9 @@
             <div id="root-content" style="display: none;">
                 <div class="card">
                     <div class="card-header">
-                        Root Folder
+                        <div style="display: inline-block;">
+                            Trace Root: <span id="trace-root-value">/home/user</span>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div>
@@ -243,9 +245,14 @@
                     },
                     body: JSON.stringify({ root_folder: selectedPath })
                 });
+                
                 const data = await response.json();
+                
                 if (data.status === 'success') {
                     showMessage('Root folder saved successfully!', 'success');
+                    
+                    document.getElementById('trace-root-value').innerText = selectedPath;
+
                 } else {
                     showMessage('Error saving root folder.', 'error');
                 }
@@ -264,6 +271,8 @@
         // As per the original structure, general is active initially, so this will be called on click.
         // However, we need to ensure initial selectedPath is correct when "Root" is first displayed.
         // So we will call fetchCurrentRootFolder when the page loads, and then fetchDirectories based on that.
+        
+        // TODO: NEED TO GET TRACE ROOT FROM BE AND DISPLAY IT AS INITIAL VALUE
         document.addEventListener('DOMContentLoaded', async () => {
             await fetchCurrentRootFolder();
             // Only fetch directories if the root content is displayed, or ensure initial selectedPath is used for first display
