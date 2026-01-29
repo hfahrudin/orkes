@@ -18,7 +18,8 @@ dependencies = [
   "aiohttp",
   "click",
   "fastapi",
-  "uvicorn"
+  "uvicorn",
+  "schedule"
 ]
 
 [project.optional-dependencies]

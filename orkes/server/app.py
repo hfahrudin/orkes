@@ -8,6 +8,8 @@ import os
 from typing import List
 import json
 
+from .scheduler import start_scheduler
+
 # Define the path for the settings file
 SETTINGS_FILE = Path(__file__).parent / "settings.json"
 
@@ -30,6 +32,9 @@ def create_app():
         description="Dashboard for Orkes LLM orchestration framework",
         version="0.1.0",
     )
+
+    # Start the scheduler
+    start_scheduler()
 
     # Mount static files (CSS, JS, images, etc.)
     # The path is relative to the directory where this file is run from
