@@ -8,6 +8,7 @@ import os
 from typing import List
 import json
 
+import uvicorn
 from .scheduler import start_scheduler
 
 # Define the path for the settings file
@@ -101,14 +102,6 @@ def create_app():
         with open(index_html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
 
-    @app.get("/dashboard", response_class=HTMLResponse)
-    async def read_dashboard():
-        dashboard_html_path = templates_dir / "dashboard.html"
-        if not dashboard_html_path.exists():
-            return HTMLResponse(content="<h1>dashboard.html not found!</h1>", status_code=404)
-        with open(dashboard_html_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-
     @app.get("/settings", response_class=HTMLResponse)
     async def read_settings():
         settings_html_path = templates_dir / "settings.html"
@@ -128,6 +121,5 @@ def create_app():
     return app
 
 if __name__ == "__main__":
-    import uvicorn
     app = create_app()
     uvicorn.run(app, host="0.0.0.0", port=8000)
