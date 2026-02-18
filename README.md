@@ -14,7 +14,7 @@
   </a>
 </p>
 
-Orkes is a Python library for building, coordinating, and observing any complex workflow that can be represented as a graph. While it is well-suited for building LLM-powered agentic systems, its core focus is on providing a flexible and intuitive graph-based framework with an emphasis on explicit control flow, transparent logic, and comprehensive traceability.
+Orkes is a Python library for building, coordinating, and observing any complex workflow that can be represented as a graph. While it is well-suited for building LLM-powered agentic systems, its core focus is on providing a flexible and intuitive graph-based framework (inspired by NetworkX) with an emphasis on explicit control flow, transparent logic, and comprehensive traceability.
 
 
 ## Getting Started
