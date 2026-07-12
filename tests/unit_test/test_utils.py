@@ -1,3 +1,4 @@
+from typing import List, Optional, Dict
 from orkes.shared.utils import callable_to_orkes_tool_schema
 
 def sample_function(name: str, age: int, city: str = "New York") -> str:
@@ -46,3 +47,30 @@ def test_callable_to_orkes_tool_schema():
     assert "name" in parameters.required
     assert "age" in parameters.required
     assert "city" not in parameters.required
+
+
+def search_function(query: str, tags: List[str], limit: Optional[int] = 10, meta: Dict = None):
+    """
+    Search for something.
+
+    Args:
+        query (str): The search query.
+        tags (List[str]): Tags to filter by.
+        limit (int): Max results.
+        meta (dict): Extra metadata.
+    """
+    pass
+
+def test_callable_to_orkes_tool_schema_with_typing_generics():
+    """
+    `typing` generics (List[...], Optional[...], Dict) don't expose a bare
+    `__name__` the way builtins do, so they must be resolved via their origin
+    instead of silently defaulting to 'string'.
+    """
+    tool_schema = callable_to_orkes_tool_schema(search_function)
+    properties = tool_schema.parameters.properties
+
+    assert properties["query"]["type"] == "string"
+    assert properties["tags"]["type"] == "array"
+    assert properties["limit"]["type"] == "integer"
+    assert properties["meta"]["type"] == "object"

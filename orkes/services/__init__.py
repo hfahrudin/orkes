@@ -1,10 +1,9 @@
-from .connectors import LLMConfig, vLLMConnection, UniversalLLMClient, LLMFactory
+from .connectors import LLMConfig, UniversalLLMClient, LLMFactory
 from .schema import  LLMProviderStrategy, LLMInterface
 from .strategies import OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
 
 __all__ = [
     "LLMConfig",
-    "vLLMConnection",
     "UniversalLLMClient",
     "LLMFactory",
     "LLMProviderStrategy",

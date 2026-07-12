@@ -55,20 +55,22 @@ Visualizing Traces
 
 After running your graph, you can generate an interactive HTML file that visualizes the entire execution trace. This is the most powerful way to use the tracer.
 
-To generate the visualization, use the ``visualize_trace`` method on the ``GraphRunner`` object after running your graph:
+To generate the visualization, use the ``visualize_trace`` method on the ``GraphRunner`` object after running your graph. ``compile()`` returns the ``GraphRunner`` directly -- there's no separate runner to construct:
 
 .. code-block:: python
 
-   from orkes.graph import OrkesGraph, GraphRunner
+   from orkes.graph import OrkesGraph
 
    # ... (define your graph)
-   
-   graph = OrkesGraph(state_class=MyState).add_node(...).compile()
-   runner = GraphRunner(graph)
+
+   graph = OrkesGraph(MyState)
+   graph.add_node(...)
+   # ... (add edges, then)
+   runner = graph.compile()
    final_state = runner.run(initial_state)
 
-   # Generate the trace file
-   runner.visualize_trace("my_workflow_trace.html")
+   # Generate the trace file (written to the 'traces' folder by default)
+   runner.visualize_trace()
 
 This will create an HTML file that you can open in your browser.
 

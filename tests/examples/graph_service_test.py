@@ -7,11 +7,10 @@ import json
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
-
-openai_api_key = os.getenv("OPENAI_API_KEY")
-
-llm_client = LLMFactory.create_openai(api_key=openai_api_key)
+# `llm_client` is assigned in the `if __name__ == "__main__":` guard below,
+# not at import time -- node functions reference it as a module global, which
+# resolves fine as long as it's set before `runner.run()` actually calls them.
+llm_client = None
 
 class SearchState(TypedDict):
     user_query: str
@@ -36,10 +35,11 @@ def planner_node(state: SearchState):
     
     messages = OrkesMessagesSchema(messages=[{"role": "user", "content": prompt}])
     response = llm_client.send_message(messages)
-    
-    # Extract content using your provided parsing logic
-    content = response.get('raw', {}).get('choices', [{}])[0].get('message', {}).get('content')
-    
+
+    # Use the parsed, provider-agnostic accessor (works the same regardless of
+    # which LLMFactory.create_* provider is configured), not the raw payload.
+    content = response['content']['content']
+
     # Parse the JSON string into a Python list
     try:
         # Removing potential markdown code blocks if the LLM adds them
@@ -75,12 +75,8 @@ def synthesis_node(state: SearchState):
     
     messages = OrkesMessagesSchema(messages=[{"role": "user", "content": prompt}])
     response = llm_client.send_message(messages)
-    
-    #TESTING DOUBLE TRACE
-    messages2 = OrkesMessagesSchema(messages=[{"role": "user", "content": prompt}])
-    _ = llm_client.send_message(messages2)
 
-    state['final_answer'] = response.get('raw', {}).get('choices', [{}])[0].get('message', {}).get('content')
+    state['final_answer'] = response['content']['content']
     print(f"\n✨ Final Answer:\n{state['final_answer']}")
     return state
 
@@ -92,41 +88,49 @@ def retrieval_consolidator(state: SearchState):
 def check_loop_condition(state: SearchState):
     return 'complete' if state.get('is_finished') else 'loop'
 
-# --- Build the Graph ---
-graph = OrkesGraph(SearchState)
+if __name__ == "__main__":
+    # Guarded behind __main__ so importing this module (e.g. if a test runner
+    # discovers it by filename) never fires a real, billed LLM API call --
+    # only running it directly does.
+    load_dotenv()
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    llm_client = LLMFactory.create_openai(api_key=openai_api_key)
 
-graph.add_node('planner', planner_node)
-graph.add_node('search_step', execute_search_node)
-graph.add_node('synthesizer', synthesis_node)
-graph.add_node('consolidate', retrieval_consolidator)
+    # --- Build the Graph ---
+    graph = OrkesGraph(SearchState)
 
-graph.add_edge(graph.START, 'planner')
-graph.add_edge('planner', 'search_step')
-graph.add_edge('consolidate', 'search_step')
+    graph.add_node('planner', planner_node)
+    graph.add_node('search_step', execute_search_node)
+    graph.add_node('synthesizer', synthesis_node)
+    graph.add_node('consolidate', retrieval_consolidator)
 
-# Loop logic
-graph.add_conditional_edge(
-    'search_step',
-    check_loop_condition,
-    {
-        'loop': 'consolidate',
-        'complete': 'synthesizer'
+    graph.add_edge(graph.START, 'planner')
+    graph.add_edge('planner', 'search_step')
+    graph.add_edge('consolidate', 'search_step')
+
+    # Loop logic
+    graph.add_conditional_edge(
+        'search_step',
+        check_loop_condition,
+        {
+            'loop': 'consolidate',
+            'complete': 'synthesizer'
+        }
+    )
+
+    graph.add_edge('synthesizer', graph.END)
+
+    # --- Execute ---
+    runner = graph.compile()
+    initial_state: SearchState = {
+        "user_query": "What are the key differences between Orkes Conductor and Temporal?",
+        "search_queries": [],
+        "current_index": 0,
+        "raw_results": [],
+        "is_finished": False,
+        "final_answer": ""
     }
-)
 
-graph.add_edge('synthesizer', graph.END)
+    runner.run(initial_state)
 
-# --- Execute ---
-runner = graph.compile()
-initial_state: SearchState = {
-    "user_query": "What are the key differences between Orkes Conductor and Temporal?",
-    "search_queries": [],
-    "current_index": 0,
-    "raw_results": [],
-    "is_finished": False,
-    "final_answer": ""
-}
-
-runner.run(initial_state)
-
-runner.visualize_trace()
+    runner.visualize_trace()

@@ -1,7 +1,7 @@
 
 from typing import Any, Callable, Dict
 import uuid
-from abc import ABC, abstractmethod
+from abc import ABC
 from orkes.graph.schema import NodePoolItem, NodeTrace, EdgeTrace
 
 class Node:

@@ -1,8 +1,6 @@
-from typing import Optional, Dict, AsyncGenerator, Any, List, Union, Callable
+from typing import Optional, Dict, AsyncGenerator, Any, Callable
 import requests
-import json
 import aiohttp
-import asyncio
 from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
 from orkes.services.schema import LLMInterface, OrkesToolSchema
 from orkes.shared.schema import OrkesMessagesSchema
@@ -53,59 +51,6 @@ class LLMConfig:
             "temperature": 0.7,
             "max_tokens": 1024
         }
-
-
-class vLLMConnection(LLMInterface):
-    """LEGACY: This class is maintained for backward compatibility only.
-
-    .. deprecated:: 0.1.0
-       Use :class:`LLMFactory` for prebuilt connections or create your own connection
-       using :class:`UniversalLLMClient`. `vLLMConnection` uses the OpenAI-compatible
-       format which is being phased out.
-    """
-    def __init__(self, url: str, model_name=str, headers: Optional[Dict[str, str]] = None, api_key=None):
-        self.url = url
-        self.headers = headers.copy() if headers else {"Content-Type": "application/json"}
-        if api_key:
-            self.headers["Authorization"] = f"Bearer {api_key}"
-
-        self.default_setting = {
-            "temperature": 0.2,
-            "top_p": 0.6,
-            "frequency_penalty": 0.2,
-            "presence_penalty": 0,
-            "seed": 22
-        }
-        self.model_name = model_name
-
-    async def stream_message(self, message, end_point="/v1/chat/completions", settings=None) -> AsyncGenerator[str, None]:
-        full_url = self.url + end_point
-        payload = {
-            "messages": message,
-            "model": self.model_name,
-            "stream": True,
-            **(settings if settings else self.default_setting)
-        }
-        # Post request to the full URL with the payload
-        response = requests.post(full_url, headers=self.headers, data=json.dumps(payload), stream=True)
-        for line in response.iter_lines():
-            yield line
-
-    def send_message(self, message, end_point="/v1/chat/completions", settings=None):
-        full_url = self.url + end_point
-        payload = {
-            "messages": message,
-            "model": self.model_name,
-            "stream": False,
-            **(settings if settings else self.default_setting)
-        }
-        # Post request to the full URL with the payload
-        response = requests.post(full_url, headers=self.headers, data=json.dumps(payload))
-        return response
-
-    def health_check(self, end_point="/health"):
-        full_url = self.url + end_point
-        return requests.get(full_url, headers=self.headers)
 
 
 class UniversalLLMClient(LLMInterface):
@@ -187,31 +132,27 @@ class UniversalLLMClient(LLMInterface):
             tools=processed_tools if len(processed_tools) > 0 else None
         )
 
-        params = {}
         edge_trace = edge_trace_var.get()
 
-        try:
-            response = requests.post(full_url, headers=self.session_headers, json=payload, params=params)
-            response.raise_for_status()
-            data = response.json()
-            parsed_response = self.provider.parse_response(data)
+        response = requests.post(full_url, headers=self.session_headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        parsed_response = self.provider.parse_response(data)
 
-            if edge_trace:
-                llm_trace = LLMTraceSchema(
-                    messages=messages,
-                    tools=tools,
-                    parsed_response=parsed_response,
-                    model=self.config.model,
-                    settings=settings
-                )
-                edge_trace.llm_traces.append(llm_trace)
+        if edge_trace:
+            llm_trace = LLMTraceSchema(
+                messages=messages,
+                tools=tools,
+                parsed_response=parsed_response,
+                model=self.config.model,
+                settings=settings
+            )
+            edge_trace.llm_traces.append(llm_trace)
 
-            return {
-                "raw": data,
-                "content": parsed_response.model_dump()
-            }
-        except requests.RequestException as e:
-            raise
+        return {
+            "raw": data,
+            "content": parsed_response.model_dump()
+        }
 
     async def stream_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[list[OrkesToolSchema | Callable]] = None, connection: Optional[Any] = None, **kwargs) -> AsyncGenerator[str, None]:
         """Sends an asynchronous request to the LLM provider and streams the response.
@@ -258,25 +199,20 @@ class UniversalLLMClient(LLMInterface):
             tools=processed_tools if len(processed_tools) > 0 else None
         )
 
-        params = {}
+        async with aiohttp.ClientSession() as session:
+            async with session.post(full_url, headers=self.session_headers, json=payload) as response:
+                response.raise_for_status()
+                async for line in response.content:
+                    if connection and hasattr(connection, 'is_disconnected'):
+                        if await connection.is_disconnected():
+                            break
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(full_url, headers=self.session_headers, json=payload, params=params) as response:
-                    response.raise_for_status()
-                    async for line in response.content:
-                        if connection and hasattr(connection, 'is_disconnected'):
-                            if await connection.is_disconnected():
-                                break
-
-                        decoded_line = line.decode('utf-8').strip()
-                        if not decoded_line:
-                            continue
-                        text_chunk = self.provider.parse_stream_chunk(decoded_line)
-                        if text_chunk:
-                            yield text_chunk
-        except (aiohttp.ClientError, asyncio.CancelledError) as e:
-            raise
+                    decoded_line = line.decode('utf-8').strip()
+                    if not decoded_line:
+                        continue
+                    text_chunk = self.provider.parse_stream_chunk(decoded_line)
+                    if text_chunk:
+                        yield text_chunk
 
     def health_check(self, endpoint: str = "/health") -> bool:
         """Performs a health check on the LLM provider.
@@ -291,7 +227,7 @@ class UniversalLLMClient(LLMInterface):
             full_url = f"{self.config.base_url}{endpoint}"
             response = requests.get(full_url, headers=self.session_headers)
             return response.status_code == 200
-        except:
+        except requests.RequestException:
             return False
 
 
@@ -383,140 +319,3 @@ class LLMFactory:
             model=model
         )
         return UniversalLLMClient(config, GoogleGeminiStrategy())
-    
-
-
-# NOTE: Example usage 
-
-# async def main():
-#     # 1. Setup for vLLM (Self-hosted)
-#     vllm_client = LLMFactory.create_vllm(
-#         url="http://localhost:8000/v1", 
-#         model="meta-llama/Llama-2-7b-chat-hf"
-#     )
-
-#     # 2. Setup for OpenAI
-#     openai_client = LLMFactory.create_openai(
-#         api_key="sk-...", 
-#         model="gpt-4o"
-#     )
-
-#     messages = [{"role": "user", "content": "Explain quantum physics in 10 words."}]
-
-#     print("--- vLLM Sync Response ---")
-#     try:
-#         response = vllm_client.send_message(messages)
-#         print(response['content'])
-#     except Exception as e:
-#         print(f"vLLM connection failed (expected if no server running): {e}")
-
-#     print("\n--- OpenAI Stream Response ---")
-#     # This assumes you have a valid key, otherwise it will error gracefully
-#     try:
-#         async for chunk in openai_client.stream_message(messages):
-#             print(chunk, end="", flush=True)
-#     except Exception as e:
-#         print(f"OpenAI connection failed: {e}")
-
-# if __name__ == "__main__":
-#     asyncio.run(main())
-
-# Building Your Own Connector
-
-# To connect to a new LLM provider, you can create your own connector by
-# implementing the `LLMProviderStrategy` and using it with the
-# `UniversalLLMClient`. This allows you to define the specific logic for
-# preparing payloads, parsing responses, and handling authentication for any
-# provider.
-
-# The following example demonstrates how to create a custom strategy for a
-# fictional "MyLLM" provider and use it to make API calls.
-
-# ```python
-# from orkes.services.strategies import LLMProviderStrategy
-# from orkes.services.schema import RequestSchema, ToolCallSchema
-# from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
-# from typing import Dict, List, Optional
-# import json
-
-# class MyLLMStrategy(LLMProviderStrategy):
-#     """
-#     A custom strategy for the fictional MyLLM provider.
-#     """
-#     def get_headers(self, api_key: str) -> Dict[str, str]:
-#         """
-#         Returns the authentication headers for MyLLM.
-#         """
-#         return {
-#             "Authorization": f"Bearer {api_key}",
-#             "Content-Type": "application/json"
-#         }
-
-#     def get_messages_payload(self, messages: OrkesMessagesSchema) -> Dict[str, List[Dict]]:
-#         """
-#         Converts an OrkesMessagesSchema into the format expected by MyLLM.
-#         """
-        
-#         processed_messages = [msg.model_dump() for msg in messages.messages]
-#         return {"chat_messages": processed_messages}
-
-#     def get_tools_payload(self, tools: List[OrkesToolSchema]) -> List[Dict]:
-#         """
-#         Converts a list of OrkesToolSchema objects into the format expected by MyLLM.
-#         """
-#         return [{"tool_info": tool.model_dump()} for tool in tools]
-
-#     def prepare_payload(self, model: str, messages: OrkesMessagesSchema, stream: bool, settings: Dict, tools: Optional[List[OrkesToolSchema]] = None) -> Dict:
-#         """
-#         Prepares the full payload for a request to MyLLM.
-#         """
-#         payload = {
-#             "model_name": model,
-#             "streaming": stream,
-#             "configurations": settings,
-#             **self.get_messages_payload(messages)
-#         }
-#         if tools:
-#             payload['available_tools'] = self.get_tools_payload(tools)
-#         return payload
-
-#     def parse_response(self, response_data: Dict) -> RequestSchema:
-#         """
-#         Parses a response from MyLLM.
-#         """
-#         if 'tool_invocations' in response_data:
-#             tools_called = [
-#                 ToolCallSchema(function_name=tool['name'], arguments=tool['args'])
-#                 for tool in response_data['tool_invocations']
-#             ]
-#             return RequestSchema(content_type="tool_calls", content=tools_called)
-#         return RequestSchema(content_type="message", content=response_data['text_response'])
-
-#     def parse_stream_chunk(self, line: str) -> Optional[str]:
-#         """
-#         Parses a single chunk of a streaming response from MyLLM.
-#         """
-#         if line.startswith("chunk: "):
-#             return line[7:]
-#         return None
-
-# # --- Example Usage ---
-# # 1. Create a configuration for your custom LLM.
-# myllm_config = LLMConfig(
-#     api_key="my-secret-api-key",
-#     base_url="https://api.myllm.com/v1",
-#     model="my-awesome-model-v1"
-# )
-
-# # 2. Instantiate the UniversalLLMClient with your custom strategy.
-# myllm_client = UniversalLLMClient(myllm_config, MyLLMStrategy())
-
-# # 3. Use the client to send messages.
-# try:
-#     response = myllm_client.send_message(
-#         messages=OrkesMessagesSchema(messages=[{"role": "user", "content": "Hello, MyLLM!"}])
-#     )
-#     print(response['content'])
-# except Exception as e:
-#     print(f"MyLLM connection failed: {e}")
-# ```

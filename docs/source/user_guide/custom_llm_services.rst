@@ -24,15 +24,17 @@ First, create a Python class for your connector. It's a good practice to have it
         def invoke(self, messages: list[OrkesMessageSchema]) -> OrkesMessageSchema:
             # This is the main method that Orkes will call.
             # It takes a list of messages and should return a single message.
-            
+            # Note: OrkesMessageSchema is a pydantic model, so use attribute
+            # access (msg.role / msg.content), not dict-style subscripting.
+
             # In a real connector, you would make an API call here.
             # For our EchoLLM, we'll just simulate the response.
             last_user_message = next(
-                (msg for msg in reversed(messages) if msg['role'] == 'user'), 
+                (msg for msg in reversed(messages) if msg.role == 'user'),
                 None
             )
 
-            response_content = "I echo: " + last_user_message['content'] if last_user_message else "I have nothing to echo."
+            response_content = "I echo: " + last_user_message.content if last_user_message else "I have nothing to echo."
 
             return OrkesMessageSchema(
                 role="assistant",
@@ -65,8 +67,8 @@ Next, define the state for your graph and a node that will use your new connecto
         # 3. Invoke the connector and get the response
         response = connector.invoke([message])
 
-        # 4. Update the state
-        state['llm_response'] = response['content']
+        # 4. Update the state (response is an OrkesMessageSchema, so use .content)
+        state['llm_response'] = response.content
         return state
 
     graph.add_node('llm', llm_node)
@@ -78,13 +80,12 @@ Finally, connect the nodes, compile the graph, and run it.
 .. code-block:: python
 
     # ... (graph and llm_node definition)
-    from orkes.graph.runner import GraphRunner
 
     graph.add_edge(graph.START, 'llm')
     graph.add_edge('llm', graph.END)
 
-    compiled_graph = graph.compile()
-    runner = GraphRunner(compiled_graph)
+    # compile() returns a ready-to-run GraphRunner -- no separate runner to construct
+    runner = graph.compile()
 
     initial_state = ChatState(user_input="Hello, Orkes!", llm_response="")
     final_state = runner.run(initial_state)

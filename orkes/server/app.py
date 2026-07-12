@@ -5,7 +5,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Request
 from fastapi.responses import JSONResponse
 import os
-from typing import List
 import json
 
 import uvicorn
@@ -76,8 +75,10 @@ def create_app():
                 # We resolve the path sent by the client relative to the base path
                 # to ensure it's a sub-directory
                 resolved_path = os.path.abspath(os.path.join(base_path_abs, path))
-            # Security check to prevent directory traversal
-            if not resolved_path.startswith(base_path_abs):
+            # Security check to prevent directory traversal.
+            # A plain startswith() would let a sibling directory that merely
+            # shares the same name prefix (e.g. "<base>-evil") slip through.
+            if resolved_path != base_path_abs and not resolved_path.startswith(base_path_abs + os.sep):
                 return JSONResponse(content={"error": "Access denied."}, status_code=403)
 
             if not os.path.isdir(resolved_path):

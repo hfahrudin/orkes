@@ -347,6 +347,11 @@ class OrkesGraph:
     def _walk_graph(self, current_node_item: NodePoolItem, path: set) -> bool:
         """Recursively walks the graph to detect loops.
 
+        Handles all edge types: a `ForwardEdge` has a single successor, while
+        `ConditionalEdge`/`ParallelEdge` have no static `to_node` (it's either
+        resolved at runtime or fanned out to multiple branches), so every
+        possible branch is explored.
+
         Args:
             current_node_item (NodePoolItem): The current node to visit.
             path (set): A set of visited node names in the current path.
@@ -356,14 +361,29 @@ class OrkesGraph:
         """
         current_node = current_node_item.node
         current_node_name = current_node.name
+        if isinstance(current_node, _EndNode):
+            return False
+
         # If the current node is already in the path, a loop is found.
         if current_node_name in path:
             return True  # Loop found
 
         path.add(current_node_name)
 
-        next_node_item = current_node_item.edge.to_node
-        if not isinstance(next_node_item.node, _EndNode):
+        edge = current_node_item.edge
+        next_node_items = []
+        if isinstance(edge, ForwardEdge):
+            next_node_items = [edge.to_node]
+        elif isinstance(edge, ConditionalEdge):
+            next_node_items = [
+                self._nodes_pool[target_name]
+                for target_name in edge.condition.values()
+                if target_name in self._nodes_pool
+            ]
+        elif isinstance(edge, ParallelEdge):
+            next_node_items = list(edge.to_nodes)
+
+        for next_node_item in next_node_items:
             if self._walk_graph(next_node_item, path):
                 return True
 

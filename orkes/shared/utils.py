@@ -1,10 +1,47 @@
-from typing import Any, Dict, List, Optional, Callable
-from pydantic import BaseModel
+from typing import Callable, Union
+import typing
 import datetime
-import ast
 import inspect
-import sys
 from orkes.shared.schema import OrkesToolSchema, ToolParameter
+
+
+_JSON_TYPE_MAPPING = {
+    'str': 'string',
+    'int': 'integer',
+    'float': 'number',
+    'bool': 'boolean',
+    'list': 'array',
+    'dict': 'object',
+}
+
+
+def _annotation_to_json_type(annotation) -> str:
+    """Resolves a type annotation to a JSON Schema type name.
+
+    Handles plain builtins (str/int/float/bool/list/dict) as well as
+    `typing` generics such as `List[str]`, `Dict[str, Any]`, and
+    `Optional[int]` (via their `typing.get_origin`), which don't expose a
+    `__name__` attribute the way builtins do.
+
+    Args:
+        annotation: The type annotation to resolve.
+
+    Returns:
+        str: The corresponding JSON Schema type name, defaulting to 'string'
+             if the annotation can't be resolved (e.g. multi-type Unions).
+    """
+    origin = typing.get_origin(annotation)
+
+    if origin is Union:
+        non_none_args = [arg for arg in typing.get_args(annotation) if arg is not type(None)]
+        if len(non_none_args) == 1:
+            return _annotation_to_json_type(non_none_args[0])
+        return 'string'
+
+    if origin is not None:
+        return _JSON_TYPE_MAPPING.get(getattr(origin, '__name__', ''), 'string')
+
+    return _JSON_TYPE_MAPPING.get(getattr(annotation, '__name__', ''), 'string')
 
 
 def callable_to_orkes_tool_schema(fn: Callable) -> OrkesToolSchema:
@@ -38,22 +75,14 @@ def callable_to_orkes_tool_schema(fn: Callable) -> OrkesToolSchema:
 
     properties = {}
     required = []
-    type_mapping = {
-        'str': 'string',
-        'int': 'integer',
-        'float': 'number',
-        'bool': 'boolean',
-        'list': 'array',
-        'dict': 'object'
-    }
 
     for name, param in signature.parameters.items():
         if name in ('self', 'cls'):
             continue
 
         param_type = 'string'  # Default type
-        if param.annotation != inspect.Parameter.empty and hasattr(param.annotation, '__name__'):
-            param_type = type_mapping.get(param.annotation.__name__, 'string')
+        if param.annotation != inspect.Parameter.empty:
+            param_type = _annotation_to_json_type(param.annotation)
 
         properties[name] = {
             'type': param_type,
@@ -108,64 +137,3 @@ def format_elapsed_time(elapsed_seconds: float) -> str:
     milliseconds, microseconds = divmod(microseconds, 1_000)
 
     return f"{minutes}m {seconds}s {milliseconds}ms {microseconds}us"
-
-def get_instances_from_func(func, state, target_class):
-    """Retrieves all instances of a target class created within a function.
-
-    This function uses a trace to inspect the local variables of the given
-    function and returns all instances of the target class.
-
-    Args:
-        func (Callable): The function to inspect.
-        state: The state to pass to the function.
-        target_class (type): The class to look for.
-
-    Returns:
-        list: A list of instances of the target class.
-    """
-    instances = []
-
-    def tracer(frame, event, arg):
-        if event == 'return':
-            for var_name, value in frame.f_locals.items():
-                if isinstance(value, target_class):
-                    instances.append(value)
-        return tracer
-
-    sys.settrace(tracer)
-    try:
-        func(state)
-    finally:
-        sys.settrace(None)
-
-    return instances
-
-
-def create_dict_from_typeddict(td_cls):
-    """Creates a dictionary with default values from a TypedDict class.
-
-    This function takes a TypedDict class and creates a dictionary with keys
-    matching the TypedDict's annotations, and values set to their "zero-value"
-    defaults.
-
-    Args:
-        td_cls (type): The TypedDict class to use.
-
-    Returns:
-        dict: A dictionary with default values.
-    """
-    type_defaults = {
-        str: "",
-        int: 0,
-        bool: False,
-        list: [],
-        List: [],
-        dict: {}
-    }
-
-    annotations = td_cls.__annotations__
-
-    return {
-        key: type_defaults.get(val_type, None)
-        for key, val_type in annotations.items()
-    }

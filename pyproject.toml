@@ -16,6 +16,7 @@ authors = [
 dependencies = [
   "pydantic>=2.0",
   "aiohttp",
+  "requests",
   "click",
   "fastapi",
   "uvicorn",

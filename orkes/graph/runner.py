@@ -6,11 +6,10 @@ import uuid
 import os
 from typing import Dict, Union, Optional
 from orkes.graph.unit import ForwardEdge, ConditionalEdge
-from orkes.graph.schema import NodePoolItem, TracesSchema, EdgeTrace
+from orkes.graph.schema import NodePoolItem, TracesSchema
 from orkes.graph.unit import _EndNode, _StartNode
 from orkes.visualizer.generator import TraceInspector
 from orkes.shared.context import trace_var, edge_id_var, edge_trace_var
-from datetime import datetime
 
 class GraphRunner:
     """Executes a compiled OrkesGraph, managing state and tracing the execution.
@@ -144,180 +143,201 @@ class GraphRunner:
         else:
             self._traverse_untraced(current_edge, input_state, stop_node_name)
 
-    def _traverse_untraced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict, stop_node_name: Optional[str] = None):
-        """Recursively traverses the graph without tracing.
+    def _run_parallel_branches(self, current_edge) -> None:
+        """Runs each parallel branch against its own isolated copy of the state.
 
-        Args:
-            current_edge (Union[ForwardEdge, ConditionalEdge]): The current edge to traverse.
-            input_state (Dict): The current state of the graph.
-            stop_node_name (Optional[str]): The name of the node at which to stop traversal.
-
-        Raises:
-            RuntimeError: If an edge is traversed more than the maximum allowed times.
+        Every branch starts from the same snapshot (taken once, before any branch
+        runs) rather than from whatever the previous branch happened to leave
+        behind. Without this, branches executed later in `to_nodes` would silently
+        observe writes made by earlier branches, making "parallel" branches
+        order-dependent. Each branch's final state is merged into the shared
+        `graph_state` only after it completes.
         """
-        current_node = current_edge.from_node.node
-        if stop_node_name and current_node.name == stop_node_name:
-            return
-            
-        if current_edge.passes > current_edge.max_passes:
-            raise RuntimeError(
-                f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
-                "exceeding the allowed maximum without reaching a stop condition."
-            )
-        else:
-            current_edge.passes += 1
-
-        
-        if current_edge.edge_type == "__forward__":
-            if not isinstance(current_node, _StartNode):
-                result = current_node.execute(input_state)
-                self.graph_state.update(result)
-
-            next_edge = current_edge.to_node.edge
-            next_node = current_edge.to_node.node
-        elif current_edge.edge_type == "__conditional__":
-            result = current_node.execute(input_state)
-            self.graph_state.update(result)
-
-            gate_function = current_edge.gate_function
-            condition = current_edge.condition
-            result_gate = gate_function(self.graph_state)
-
-            next_node_name = condition[result_gate]
-
-            next_node = self.nodes_pool[next_node_name].node
-            next_edge = self.nodes_pool[next_node_name].edge
-        elif current_edge.edge_type == "__parallel__":
-            if not isinstance(current_node, _StartNode):
-                result = current_node.execute(input_state)
-                self.graph_state.update(result)
-
-            # Recursively traverse each parallel branch
-            for to_node_item in current_edge.to_nodes:
-                branch_start_edge = self.nodes_pool[to_node_item.node.name].edge
+        base_state = self.graph_state.copy()
+        branch_results = []
+        for to_node_item in current_edge.to_nodes:
+            branch_start_edge = self.nodes_pool[to_node_item.node.name].edge
+            outer_graph_state = self.graph_state
+            self.graph_state = base_state.copy()
+            try:
                 self.traverse_graph(branch_start_edge, self.graph_state.copy(), stop_node_name=current_edge.aggregation_node.node.name)
+                branch_results.append(self.graph_state)
+            finally:
+                self.graph_state = outer_graph_state
 
-            # After all parallel branches are (sequentially) traversed,
-            # the control flow should move to the aggregation node.
-            # The 'next_edge' should be the one coming *out* of the aggregation node.
-            next_node = current_edge.aggregation_node.node
-            next_edge = current_edge.aggregation_node.edge
+        # Merge only what each branch actually changed relative to the shared
+        # base snapshot. Updating with a branch's *entire* dict would re-apply
+        # its stale, untouched keys (still holding pre-fan-out values) and
+        # clobber another branch's already-merged contribution to that key.
+        for branch_result in branch_results:
+            changed = {
+                key: value for key, value in branch_result.items()
+                if key not in base_state or base_state[key] != value
+            }
+            self.graph_state.update(changed)
 
-        if not isinstance(next_node, _EndNode):
-            next_input = self.graph_state.copy()
-            self.traverse_graph(next_edge, next_input, stop_node_name)
+    def _traverse_untraced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict, stop_node_name: Optional[str] = None):
+        """Iteratively traverses the graph without tracing.
 
-    def _traverse_traced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict, stop_node_name: Optional[str] = None):
-        """Recursively traverses the graph with tracing.
+        Each step's next edge/state is fed back into the loop rather than
+        recursed into, so a long-running loop (many conditional-edge passes)
+        doesn't grow the Python call stack and can't hit `RecursionError`.
+        Only genuinely nested traversals -- parallel branches, which each
+        start their own bounded call into `traverse_graph` -- still recurse.
 
         Args:
-            current_edge (Union[ForwardEdge, ConditionalEdge]): The current edge to traverse.
+            current_edge (Union[ForwardEdge, ConditionalEdge]): The edge to start traversal from.
             input_state (Dict): The current state of the graph.
             stop_node_name (Optional[str]): The name of the node at which to stop traversal.
 
         Raises:
             RuntimeError: If an edge is traversed more than the maximum allowed times.
         """
-        current_node = current_edge.from_node.node
-        if stop_node_name and current_node.name == stop_node_name:
-            return
+        while True:
+            current_node = current_edge.from_node.node
+            if stop_node_name and current_node.name == stop_node_name:
+                return
 
-        edge_token = edge_id_var.set(current_edge.id)
-        try:
+            current_edge.passes += 1
             if current_edge.passes > current_edge.max_passes:
                 raise RuntimeError(
                     f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
                     "exceeding the allowed maximum without reaching a stop condition."
                 )
-            else:
-                current_edge.passes += 1
-                self.run_number += 1
 
-            edge_trace = current_edge.edge_trace.model_copy()
-            edge_trace.edge_run_number = self.run_number
-            edge_trace.passes_left = current_edge.max_passes - current_edge.passes
-            start = time.time()
-            edge_trace.state_snapshot = input_state.copy()
-
-
-            edge_trace_token = edge_trace_var.set(edge_trace)
-            try:
-                if current_edge.edge_type == "__forward__":
-                    if not isinstance(current_node, _StartNode):
-                        result = current_node.execute(input_state)
-                        self.graph_state.update(result)
-
-                    next_edge = current_edge.to_node.edge
-                    next_node = current_edge.to_node.node
-                elif current_edge.edge_type == "__conditional__":
+            if current_edge.edge_type == "__forward__":
+                if not isinstance(current_node, _StartNode):
                     result = current_node.execute(input_state)
                     self.graph_state.update(result)
 
-                    gate_function = current_edge.gate_function
-                    condition = current_edge.condition
-                    result_gate = gate_function(self.graph_state)
+                next_edge = current_edge.to_node.edge
+                next_node = current_edge.to_node.node
+            elif current_edge.edge_type == "__conditional__":
+                result = current_node.execute(input_state)
+                self.graph_state.update(result)
 
-                    next_node_name = condition[result_gate]
+                gate_function = current_edge.gate_function
+                condition = current_edge.condition
+                result_gate = gate_function(self.graph_state)
+                if result_gate not in condition:
+                    raise KeyError(
+                        f"Gate function on node '{current_node.name}' returned {result_gate!r}, "
+                        f"which is not a valid key in its condition map {list(condition.keys())}."
+                    )
 
-                    next_node = self.nodes_pool[next_node_name].node
-                    next_edge = self.nodes_pool[next_node_name].edge
-                    edge_trace.to_node = next_node_name
-                elif current_edge.edge_type == "__parallel__":
-                    if not isinstance(current_node, _StartNode):
+                next_node_name = condition[result_gate]
+
+                next_node = self.nodes_pool[next_node_name].node
+                next_edge = self.nodes_pool[next_node_name].edge
+            elif current_edge.edge_type == "__parallel__":
+                if not isinstance(current_node, _StartNode):
+                    result = current_node.execute(input_state)
+                    self.graph_state.update(result)
+
+                self._run_parallel_branches(current_edge)
+
+                # After all parallel branches are (sequentially) traversed,
+                # the control flow should move to the aggregation node.
+                # The 'next_edge' should be the one coming *out* of the aggregation node.
+                next_node = current_edge.aggregation_node.node
+                next_edge = current_edge.aggregation_node.edge
+
+            if isinstance(next_node, _EndNode):
+                return
+
+            current_edge = next_edge
+            input_state = self.graph_state.copy()
+
+    def _traverse_traced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict, stop_node_name: Optional[str] = None):
+        """Iteratively traverses the graph with tracing.
+
+        See `_traverse_untraced` for why this loops instead of recursing.
+        `edge_id_var`/`edge_trace_var` are still set/reset once per edge, just
+        within the loop body rather than across a recursive call, so LLM
+        traces recorded during a node's execution still attach to the
+        correct edge.
+
+        Args:
+            current_edge (Union[ForwardEdge, ConditionalEdge]): The edge to start traversal from.
+            input_state (Dict): The current state of the graph.
+            stop_node_name (Optional[str]): The name of the node at which to stop traversal.
+
+        Raises:
+            RuntimeError: If an edge is traversed more than the maximum allowed times.
+        """
+        while True:
+            current_node = current_edge.from_node.node
+            if stop_node_name and current_node.name == stop_node_name:
+                return
+
+            edge_token = edge_id_var.set(current_edge.id)
+            try:
+                current_edge.passes += 1
+                if current_edge.passes > current_edge.max_passes:
+                    raise RuntimeError(
+                        f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
+                        "exceeding the allowed maximum without reaching a stop condition."
+                    )
+                self.run_number += 1
+
+                edge_trace = current_edge.edge_trace.model_copy()
+                edge_trace.edge_run_number = self.run_number
+                edge_trace.passes_left = current_edge.max_passes - current_edge.passes
+                start = time.time()
+                edge_trace.state_snapshot = input_state.copy()
+
+                edge_trace_token = edge_trace_var.set(edge_trace)
+                try:
+                    if current_edge.edge_type == "__forward__":
+                        if not isinstance(current_node, _StartNode):
+                            result = current_node.execute(input_state)
+                            self.graph_state.update(result)
+
+                        next_edge = current_edge.to_node.edge
+                        next_node = current_edge.to_node.node
+                    elif current_edge.edge_type == "__conditional__":
                         result = current_node.execute(input_state)
                         self.graph_state.update(result)
 
-                    # Record the parallel branch starting points in the trace
-                    edge_trace.to_node = [node_item.node.name for node_item in current_edge.to_nodes]
-                    edge_trace.meta["aggregation_node"] = current_edge.aggregation_node.node.name
+                        gate_function = current_edge.gate_function
+                        condition = current_edge.condition
+                        result_gate = gate_function(self.graph_state)
+                        if result_gate not in condition:
+                            raise KeyError(
+                                f"Gate function on node '{current_node.name}' returned {result_gate!r}, "
+                                f"which is not a valid key in its condition map {list(condition.keys())}."
+                            )
 
-                    # Recursively traverse each parallel branch
-                    for to_node_item in current_edge.to_nodes:
-                        branch_start_edge = self.nodes_pool[to_node_item.node.name].edge
-                        # Pass a copy of the state to simulate independent branches for tracing,
-                        # but the graph_state itself is shared.
-                        self.traverse_graph(branch_start_edge, self.graph_state.copy(), stop_node_name=current_edge.aggregation_node.node.name)
+                        next_node_name = condition[result_gate]
 
-                    # After all parallel branches are (sequentially) traversed,
-                    # the control flow should move to the aggregation node.
-                    next_node = current_edge.aggregation_node.node
-                    next_edge = current_edge.aggregation_node.edge
+                        next_node = self.nodes_pool[next_node_name].node
+                        next_edge = self.nodes_pool[next_node_name].edge
+                        edge_trace.to_node = next_node_name
+                    elif current_edge.edge_type == "__parallel__":
+                        if not isinstance(current_node, _StartNode):
+                            result = current_node.execute(input_state)
+                            self.graph_state.update(result)
+
+                        # Record the parallel branch starting points in the trace
+                        edge_trace.to_node = [node_item.node.name for node_item in current_edge.to_nodes]
+                        edge_trace.meta["aggregation_node"] = current_edge.aggregation_node.node.name
+
+                        self._run_parallel_branches(current_edge)
+
+                        # After all parallel branches are (sequentially) traversed,
+                        # the control flow should move to the aggregation node.
+                        next_node = current_edge.aggregation_node.node
+                        next_edge = current_edge.aggregation_node.edge
+                finally:
+                    edge_trace_var.reset(edge_trace_token)
+
+                edge_trace.elapsed = time.time() - start
+                self.trace.edges_trace.append(edge_trace)
             finally:
-                edge_trace_var.reset(edge_trace_token)
+                edge_id_var.reset(edge_token)
 
-            edge_trace.elapsed = time.time() - start
-            self.trace.edges_trace.append(edge_trace)
+            if isinstance(next_node, _EndNode):
+                return
 
-            if not isinstance(next_node, _EndNode):
-                next_input = self.graph_state.copy()
-                self.traverse_graph(next_edge, next_input, stop_node_name)
-        finally:
-            edge_id_var.reset(edge_token)
-
-
-# Handle Brancing and merging state -> because state update only happen after node process done, no shared mutable object
-# FAN IN FAN OUT STRATEGY, EVERY BRANCHING NODE NEED TO BE RETURNED
-# In your example:
-#     A
-#     |
-#     B
-#    / \
-#   C   D
-#        \
-#         E
-# If E needs data from both C and D, you have two main options:
-
-# Make E a "merge node" that accepts inputs from both C and D — i.e., edges C -> E and D -> E.
-
-# E will receive two incoming states, merge them internally, then execute.
-
-# Insert an explicit merge node (e.g., M):
-
-#     C   D
-#      \ /
-#       M
-#       |
-#       E
-# The merge node M merges C and D’s outputs.
-
-# Then E runs with the combined state.
+            current_edge = next_edge
+            input_state = self.graph_state.copy()

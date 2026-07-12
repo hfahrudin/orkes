@@ -1,6 +1,9 @@
 pydantic
 fastapi
 uvicorn
+requests
+click
+schedule
 python-dotenv
 pytest
 pytest-html

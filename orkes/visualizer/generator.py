@@ -2,8 +2,6 @@ import json
 import itertools
 from typing import Union, Dict, List, Optional
 from pathlib import Path
-import os
-import argparse
 from orkes.shared.utils import format_elapsed_time, format_start_time
 
 # Default color palette for function nodes in the visualization.

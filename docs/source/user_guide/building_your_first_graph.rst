@@ -65,18 +65,14 @@ Now, we define the flow of execution using edges. We'll connect the start of the
 
 4. Compile and Run the Graph
 ----------------------------
-Before we can run the graph, we need to compile it. Then we can create a ``GraphRunner`` and execute the graph with an initial state.
+Before we can run the graph, we need to compile it. ``compile()`` returns a ``GraphRunner`` ready to execute -- there's no separate runner to construct.
 
 .. code-block:: python
 
     # ... (full graph definition)
-    from orkes.graph.runner import GraphRunner
 
-    # Compile the graph
-    compiled_graph = graph.compile()
-
-    # Create a runner and an initial state
-    runner = GraphRunner(compiled_graph)
+    # Compile the graph -- this returns a GraphRunner
+    runner = graph.compile()
     initial_state = GreetingState(name="World", greeting="")
 
     # Run the graph
@@ -93,7 +89,7 @@ After running the graph, you can generate an interactive trace to visualize the 
 
     # ... (after runner.run)
 
-    runner.visualize_trace("greeting_trace.html")
-    print("Trace file 'greeting_trace.html' generated.")
+    runner.visualize_trace()
+    print("Trace file generated in the 'traces' folder.")
 
-This will create an HTML file that you can open in your browser to inspect the graph's execution and state changes.
+This will create an HTML file (named ``trace_{run_id}_inspector.html`` inside the ``traces`` directory by default) that you can open in your browser to inspect the graph's execution and state changes.

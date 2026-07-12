@@ -1,6 +1,5 @@
 import click
 import uvicorn
-from orkes.server.app import create_app
 
 @click.group()
 def cli():

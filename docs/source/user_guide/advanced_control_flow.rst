@@ -26,11 +26,13 @@ Conditional edges work by using a "gate function". This is a simple Python funct
 2. The Conditional Edge
 -----------------------
 
-You create a conditional edge using the ``add_conditional_edge`` method. This method takes four arguments:
+You create a conditional edge using the ``add_conditional_edge`` method. This method takes:
 - The name of the source node.
 - The gate function.
 - A dictionary that maps the possible return values of the gate function to the names of the destination nodes.
-- (Optional) A default destination node, if none of the keys in the dictionary match the return value of the gate function.
+- (Optional) ``max_passes``, capping how many times this edge can be traversed (see the Looping section below).
+
+There is no fallback/default destination -- if the gate function returns a value that isn't a key in the dictionary, Orkes raises a ``KeyError`` naming the node, the unexpected value, and the valid options, so make sure every possible return value of your gate function has a matching entry.
 
 
 .. mermaid::
@@ -72,7 +74,7 @@ You create a conditional edge using the ``add_conditional_edge`` method. This me
 
 3. Looping
 ----------
-You can create loops by routing a conditional edge back to a previous node in the graph. Orkes has a built-in mechanism to prevent infinite loops. The ``GraphRunner`` has a ``max_passes`` parameter (defaulting to 10) that will stop the execution if the graph runs for too many steps.
+You can create loops by routing a conditional edge back to a previous node in the graph. Orkes has a built-in mechanism to prevent infinite loops: every ``add_edge``, ``add_conditional_edge``, and ``add_parallel_edges`` call accepts a ``max_passes`` argument (defaulting to ``25``) that caps how many times that specific edge can be traversed before Orkes raises a ``RuntimeError``.
 
 .. mermaid::
 
@@ -100,15 +102,16 @@ You can create loops by routing a conditional edge back to a previous node in th
         {
             'continue': 'increment_node', # Edge back to the same node
             'finish': graph.END
-        }
+        },
+        max_passes=100  # allow up to 100 loop iterations on this edge (default is 25)
     )
 
 4. Parallel Execution
 ---------------------
-Orkes supports parallel execution of different branches in the graph, a pattern also known as a **fan-out/fan-in** strategy.
+Orkes supports branching a graph into multiple independent paths, a pattern also known as a **fan-out/fan-in** strategy.
 
-- **Fan-Out**: The graph "fans out" from a single node to execute multiple branches concurrently.
-- **Fan-In**: The parallel branches "fan in" to a single aggregation node, ensuring the main execution path only continues after all parallel work is complete.
+- **Fan-Out**: The graph "fans out" from a single node into multiple branches. Each branch runs against its own isolated copy of the state, so branches never see each other's writes -- but branches currently execute one after another rather than truly concurrently.
+- **Fan-In**: The branches "fan in" to a single aggregation node, which runs exactly once after every branch has completed, with each branch's changes merged into the shared state. The main execution path only continues from there.
 
 .. mermaid::
 

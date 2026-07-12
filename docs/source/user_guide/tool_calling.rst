@@ -9,13 +9,13 @@ Orkes provides a flexible way to integrate external tools into your workflows. T
 Defining a Tool
 ---------------
 
-You can define a tool using the ``orkes.agents.schema.OrkesToolSchema``. This schema describes the tool's name, description, and the parameters it accepts. The parameter schema follows the JSON Schema standard.
+You can define a tool using ``orkes.shared.schema.OrkesToolSchema``. This schema describes the tool's name, description, and the parameters it accepts. The parameter schema follows the JSON Schema standard.
 
 Here's an example of how to define a ``get_weather`` tool:
 
 .. code-block:: python
 
-    from orkes.agents.schema import OrkesToolSchema
+    from orkes.shared.schema import OrkesToolSchema
 
     orkes_tool = OrkesToolSchema(
         name="get_weather",
@@ -58,13 +58,16 @@ Here's an example of how to define a ``get_weather`` tool:
     # The 'orkes_tool' is the same as defined above
     response = openai_client.send_message(messages, tools=[orkes_tool])
 
-    # The response will contain a tool_calls attribute if the LLM decides to use the tool
-    if response.tool_calls:
-        # You can then process the tool call and send the result back to the LLM
-        tool_call = response.tool_calls[0]
-        if tool_call.function.name == "get_weather":
-            # ... call your actual get_weather function ...
-            pass
+    # response['content'] is the dumped RequestSchema: {"content_type": ..., "content": ...}
+    # content_type is "tool_calls" if the LLM decided to use a tool, or "message" for plain text.
+    if response["content"]["content_type"] == "tool_calls":
+        # 'content' is then a list of dumped ToolCallSchema dicts: {"function_name": ..., "arguments": {...}}
+        for tool_call in response["content"]["content"]:
+            if tool_call["function_name"] == "get_weather":
+                # ... call your actual get_weather function with tool_call["arguments"] ...
+                pass
+    else:
+        print(response["content"]["content"])  # plain text reply
 
 
 Using Python Functions Directly as Tools
@@ -83,8 +86,8 @@ Here's how you can achieve the same ``get_weather`` tool definition using a Pyth
         """
         Get the current weather in a given location.
 
-        :param location: The city and state, e.g. "San Francisco, CA"
-        :return: A string describing the current weather.
+        Args:
+            location: The city and state, e.g. "San Francisco, CA"
         """
         # In a real application, this would call an external weather API
         if "San Francisco" in location:
@@ -96,11 +99,10 @@ Here's how you can achieve the same ``get_weather`` tool definition using a Pyth
     # Pass the Python function directly to the tools argument
     response = openai_client.send_message(messages, tools=[get_weather])
 
-    if response.tool_calls:
-        tool_call = response.tool_calls[0]
-        if tool_call.function.name == "get_weather":
-            # Execute the function with arguments from the LLM's tool call
-            function_args = tool_call.function.arguments
-            weather_report = get_weather(**function_args)
-            print(f"Weather report: {weather_report}")
-            # ... send the tool result back to the LLM ...
+    if response["content"]["content_type"] == "tool_calls":
+        for tool_call in response["content"]["content"]:
+            if tool_call["function_name"] == "get_weather":
+                # Execute the function with arguments from the LLM's tool call
+                weather_report = get_weather(**tool_call["arguments"])
+                print(f"Weather report: {weather_report}")
+                # ... send the tool result back to the LLM ...

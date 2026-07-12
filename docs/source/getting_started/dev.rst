@@ -19,20 +19,24 @@ To get started with development, follow these steps:
         git clone https://github.com/hfahrudin/orkes.git
         cd orkes
 
-2.  **Install in editable mode:**
-    Install the project in editable mode, which allows you to make changes to the source code without reinstalling:
+2.  **Set up the environment (recommended: uv):**
+    The project is managed with `uv <https://docs.astral.sh/uv/>`_. This creates
+    a ``.venv``, resolves dependencies from ``pyproject.toml`` against the
+    committed ``uv.lock``, and installs Orkes itself in editable mode, all in
+    one step:
+
+    .. code-block:: bash
+
+        uv sync --all-extras
+        source .venv/bin/activate
+
+3.  **Alternative: plain pip**
+    If you're not using uv, you can set up the environment manually instead:
 
     .. code-block:: bash
 
         pip install -e .
-
-2.  **Install project dependencies:**
-    Run pip to install all necessary dependencies. This sets up the local environment required to run and develop the project.
-
-    .. code-block:: bash
-
         pip install -r requirements.txt
-                
 
 .. warning:: 
     Remember to add test cases for any newly implemented features. Ensure that new functionality is covered by unit or integration tests to maintain high code quality and prevent future regressions.

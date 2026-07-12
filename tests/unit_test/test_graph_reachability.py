@@ -113,3 +113,37 @@ def test_reachability_from_end_node(complex_graph):
     assert complex_graph.can_reach_node(complex_graph.END.name, 'add_3') == False
     assert complex_graph.can_reach_node(complex_graph.END.name, complex_graph.START.name) == False
     assert complex_graph.can_reach_node(complex_graph.END.name, complex_graph.END.name) == True # Can "reach" itself
+
+
+def test_detect_loop_through_conditional_edge(complex_graph):
+    """detect_loop must not crash on ConditionalEdge/ParallelEdge, whose static
+    `to_node` is None (conditional targets are resolved from `condition`,
+    parallel targets from `to_nodes`). `complex_graph` loops path_false ->
+    multiply_by_2 via a conditional edge, so a loop must be detected."""
+    assert complex_graph.detect_loop() == True
+
+
+def test_detect_loop_false_for_conditional_dag():
+    """A conditional edge with no cycle back to an ancestor should report no loop."""
+    graph = OrkesGraph(State)
+    graph.add_node('add_3', add_3)
+    graph.add_node('path_true', path_true_node)
+    graph.add_node('path_false', path_false_node)
+    graph.add_edge(graph.START, 'add_3')
+    graph.add_conditional_edge('add_3', conditional_node, {'true': 'path_true', 'false': 'path_false'})
+    graph.add_edge('path_true', graph.END)
+    graph.add_edge('path_false', graph.END)
+    assert graph.detect_loop() == False
+
+
+def test_detect_loop_through_parallel_edge():
+    """detect_loop must also handle ParallelEdge's multiple `to_nodes`."""
+    graph = OrkesGraph(State)
+    graph.add_node('add_3', add_3)
+    graph.add_node('multiply_by_2', multiply_by_2)
+    graph.add_node('greater_than_10', greater_than_10)
+    graph.add_edge(graph.START, 'add_3')
+    graph.add_parallel_edges('add_3', ['multiply_by_2', 'greater_than_10'], 'multiply_by_2')
+    graph.add_edge('greater_than_10', 'multiply_by_2')
+    graph.add_edge('multiply_by_2', graph.END)
+    assert graph.detect_loop() == False
