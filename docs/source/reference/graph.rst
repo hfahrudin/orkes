@@ -42,6 +42,7 @@ Units
    :toctree: ../api/
 
    Node
+   AggregationNode
    Edge
    ForwardEdge
    ConditionalEdge

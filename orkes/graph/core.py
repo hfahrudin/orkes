@@ -1,6 +1,6 @@
 from typing import Callable, Union, Dict, List
 from orkes.graph.utils import function_assertion, is_typeddict_class
-from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode, ParallelEdge
+from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode, ParallelEdge, AggregationNode
 from orkes.graph.schema import NodePoolItem
 from orkes.graph.runner import GraphRunner
 import uuid
@@ -196,7 +196,14 @@ class OrkesGraph:
             raise ValueError(f"Aggregation node '{aggregation_node}' does not exist.")
         aggregation_node_item = self._nodes_pool[aggregation_node]
 
-        
+        # Promote the node in place to an AggregationNode so the runner knows
+        # to offer it each branch's independent result. Mutating `.node`
+        # (rather than replacing the NodePoolItem) preserves identity for any
+        # edge that already references this NodePoolItem.
+        if not isinstance(aggregation_node_item.node, AggregationNode):
+            existing = aggregation_node_item.node
+            aggregation_node_item.node = AggregationNode(existing.name, existing.func, existing.graph_state)
+
         edge = ParallelEdge(from_node_item, to_node_items, aggregation_node_item, max_passes=max_passes)
         self._edges_pool.append(edge)
         self._nodes_pool[from_node_item.node.name].edge = edge
@@ -320,6 +327,20 @@ class OrkesGraph:
                             f"Validation failed: Parallel branch starting at '{to_node_name}' "
                             f"cannot reach the aggregation node '{aggregation_node_name}'."
                         )
+                agg_node = edge.aggregation_node.node
+                if isinstance(agg_node, AggregationNode) and not agg_node.accepts_branch_results:
+                    raise TypeError(
+                        f"Aggregation node '{agg_node.name}' must accept a `branch_results` "
+                        f"parameter: `def {agg_node.name}(state, branch_results): ...`. "
+                        f"A ParallelEdge forks state into independent copies per branch and "
+                        f"does not auto-merge them back -- without `branch_results`, the "
+                        f"aggregation node has no way to see what each branch produced, so "
+                        f"any of their state changes would be silently lost. You don't have "
+                        f"to use `branch_results` inside the function (e.g. `return state` "
+                        f"is fine if you're intentionally discarding branch output), but the "
+                        f"parameter must be declared so that choice is explicit rather than "
+                        f"accidental."
+                    )
             # TODO: Add checks for conditional edges.
             elif edge.edge_type == "__conditional__":
                 pass

@@ -8,7 +8,7 @@ from .schema import (
     EdgeTrace,
     TracesSchema
 )
-from .unit import Node, Edge, ForwardEdge, ConditionalEdge, ParallelEdge
+from .unit import Node, AggregationNode, Edge, ForwardEdge, ConditionalEdge, ParallelEdge
 from .utils import orkes_tracable, function_assertion, is_typeddict_class
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "EdgeTrace",
     "TracesSchema",
     "Node",
+    "AggregationNode",
     "Edge",
     "ForwardEdge",
     "ConditionalEdge",

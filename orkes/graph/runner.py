@@ -1,5 +1,6 @@
 
 
+import copy
 import json
 import time
 import uuid
@@ -7,7 +8,7 @@ import os
 from typing import Dict, Union, Optional
 from orkes.graph.unit import ForwardEdge, ConditionalEdge
 from orkes.graph.schema import NodePoolItem, TracesSchema
-from orkes.graph.unit import _EndNode, _StartNode
+from orkes.graph.unit import _EndNode, _StartNode, AggregationNode
 from orkes.visualizer.generator import TraceInspector
 from orkes.shared.context import trace_var, edge_id_var, edge_trace_var
 
@@ -67,6 +68,7 @@ class GraphRunner:
         self.traces_dir = traces_dir
         self.run_number = 0
         self.auto_save_trace = auto_save_trace
+        self._pending_branch_results = None
 
     def save_run_trace(self):
         """Saves the execution trace to a JSON file."""
@@ -143,38 +145,54 @@ class GraphRunner:
         else:
             self._traverse_untraced(current_edge, input_state, stop_node_name)
 
-    def _run_parallel_branches(self, current_edge) -> None:
+    def _execute_node(self, node, input_state) -> Dict:
+        """Executes a node, passing along pending branch results if it's an
+        `AggregationNode`.
+
+        `_run_parallel_branches` computes branch results one loop iteration
+        before the aggregation node is actually executed (it's just the
+        `from_node` of the *next* edge at that point), so the pending
+        results are handed off via `self._pending_branch_results` rather
+        than a direct argument.
+        """
+        if isinstance(node, AggregationNode):
+            branch_results = self._pending_branch_results
+            self._pending_branch_results = None
+            return node.execute(input_state, branch_results)
+        return node.execute(input_state)
+
+    def _run_parallel_branches(self, current_edge) -> Dict[str, Dict]:
         """Runs each parallel branch against its own isolated copy of the state.
 
-        Every branch starts from the same snapshot (taken once, before any branch
-        runs) rather than from whatever the previous branch happened to leave
-        behind. Without this, branches executed later in `to_nodes` would silently
-        observe writes made by earlier branches, making "parallel" branches
-        order-dependent. Each branch's final state is merged into the shared
-        `graph_state` only after it completes.
+        Every branch starts from a deep copy of the same snapshot (taken once,
+        before any branch runs) rather than from whatever the previous branch
+        happened to leave behind, and each branch's copy is independently deep
+        -copied so in-place mutations (e.g. `state['x'].append(...)`) in one
+        branch can never leak into another.
+
+        Nothing is merged back into `graph_state` automatically -- the
+        aggregation node receives the pre-fork state as its own input, plus
+        every branch's independent final state (keyed by that branch's entry
+        node name) if it opts in via a second parameter. It decides explicitly
+        what survives.
+
+        Returns:
+            Dict[str, Dict]: Each branch's final state, keyed by the name of
+                the node the branch started at.
         """
-        base_state = self.graph_state.copy()
-        branch_results = []
+        base_state = copy.deepcopy(self.graph_state)
+        branch_results = {}
         for to_node_item in current_edge.to_nodes:
             branch_start_edge = self.nodes_pool[to_node_item.node.name].edge
             outer_graph_state = self.graph_state
-            self.graph_state = base_state.copy()
+            self.graph_state = copy.deepcopy(base_state)
             try:
                 self.traverse_graph(branch_start_edge, self.graph_state.copy(), stop_node_name=current_edge.aggregation_node.node.name)
-                branch_results.append(self.graph_state)
+                branch_results[to_node_item.node.name] = self.graph_state
             finally:
                 self.graph_state = outer_graph_state
 
-        # Merge only what each branch actually changed relative to the shared
-        # base snapshot. Updating with a branch's *entire* dict would re-apply
-        # its stale, untouched keys (still holding pre-fan-out values) and
-        # clobber another branch's already-merged contribution to that key.
-        for branch_result in branch_results:
-            changed = {
-                key: value for key, value in branch_result.items()
-                if key not in base_state or base_state[key] != value
-            }
-            self.graph_state.update(changed)
+        return branch_results
 
     def _traverse_untraced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict, stop_node_name: Optional[str] = None):
         """Iteratively traverses the graph without tracing.
@@ -207,13 +225,13 @@ class GraphRunner:
 
             if current_edge.edge_type == "__forward__":
                 if not isinstance(current_node, _StartNode):
-                    result = current_node.execute(input_state)
+                    result = self._execute_node(current_node, input_state)
                     self.graph_state.update(result)
 
                 next_edge = current_edge.to_node.edge
                 next_node = current_edge.to_node.node
             elif current_edge.edge_type == "__conditional__":
-                result = current_node.execute(input_state)
+                result = self._execute_node(current_node, input_state)
                 self.graph_state.update(result)
 
                 gate_function = current_edge.gate_function
@@ -231,10 +249,10 @@ class GraphRunner:
                 next_edge = self.nodes_pool[next_node_name].edge
             elif current_edge.edge_type == "__parallel__":
                 if not isinstance(current_node, _StartNode):
-                    result = current_node.execute(input_state)
+                    result = self._execute_node(current_node, input_state)
                     self.graph_state.update(result)
 
-                self._run_parallel_branches(current_edge)
+                self._pending_branch_results = self._run_parallel_branches(current_edge)
 
                 # After all parallel branches are (sequentially) traversed,
                 # the control flow should move to the aggregation node.
@@ -290,13 +308,13 @@ class GraphRunner:
                 try:
                     if current_edge.edge_type == "__forward__":
                         if not isinstance(current_node, _StartNode):
-                            result = current_node.execute(input_state)
+                            result = self._execute_node(current_node, input_state)
                             self.graph_state.update(result)
 
                         next_edge = current_edge.to_node.edge
                         next_node = current_edge.to_node.node
                     elif current_edge.edge_type == "__conditional__":
-                        result = current_node.execute(input_state)
+                        result = self._execute_node(current_node, input_state)
                         self.graph_state.update(result)
 
                         gate_function = current_edge.gate_function
@@ -315,14 +333,14 @@ class GraphRunner:
                         edge_trace.to_node = next_node_name
                     elif current_edge.edge_type == "__parallel__":
                         if not isinstance(current_node, _StartNode):
-                            result = current_node.execute(input_state)
+                            result = self._execute_node(current_node, input_state)
                             self.graph_state.update(result)
 
                         # Record the parallel branch starting points in the trace
                         edge_trace.to_node = [node_item.node.name for node_item in current_edge.to_nodes]
                         edge_trace.meta["aggregation_node"] = current_edge.aggregation_node.node.name
 
-                        self._run_parallel_branches(current_edge)
+                        self._pending_branch_results = self._run_parallel_branches(current_edge)
 
                         # After all parallel branches are (sequentially) traversed,
                         # the control flow should move to the aggregation node.

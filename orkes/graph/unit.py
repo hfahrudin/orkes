@@ -1,5 +1,6 @@
 
 from typing import Any, Callable, Dict
+import inspect
 import uuid
 from abc import ABC
 from orkes.graph.schema import NodePoolItem, NodeTrace, EdgeTrace
@@ -93,6 +94,43 @@ class _EndNode(Node):
     def _end(self, state):
         """The termination point of the graph."""
         return state
+
+
+class AggregationNode(Node):
+    """A node that runs once all of a `ParallelEdge`'s branches complete.
+
+    Unlike a regular `Node`, its function must accept a second parameter --
+    a dict of each branch's independent final state, keyed by the branch's
+    entry node name -- so it can explicitly decide how to combine values
+    that multiple branches wrote, instead of the runner silently picking a
+    winner. `OrkesGraph.compile()` enforces this signature and raises if
+    it's missing. The function body is free to ignore the parameter
+    entirely (e.g. `return state` if branch output is genuinely not
+    needed) -- only the parameter's presence is required, not its use. The
+    state passed as the first argument is always the snapshot from the
+    moment the branches forked; nothing a branch wrote is merged in
+    automatically.
+    """
+    def __init__(self, name: str, func: Callable, graph_state):
+        super().__init__(name, func, graph_state)
+        self.node_trace.meta["type"] = "aggregation_node"
+        self.accepts_branch_results = len(inspect.signature(func).parameters) >= 2
+
+    def execute(self, input_state: Any, branch_results: Dict[str, Any] = None) -> Any:
+        """Executes the aggregation function.
+
+        Args:
+            input_state: The state as it was when the parallel branches forked.
+            branch_results (Dict[str, Any]): Each branch's independent final
+                state, keyed by the branch's entry node name.
+
+        Returns:
+            Any: The output of the function.
+        """
+        if self.accepts_branch_results:
+            return self.func(input_state, branch_results)
+        return self.func(input_state)
+
 
 class Edge(ABC):
     """Represents a directed connection between two nodes in the graph.

@@ -110,8 +110,8 @@ You can create loops by routing a conditional edge back to a previous node in th
 ---------------------
 Orkes supports branching a graph into multiple independent paths, a pattern also known as a **fan-out/fan-in** strategy.
 
-- **Fan-Out**: The graph "fans out" from a single node into multiple branches. Each branch runs against its own isolated copy of the state, so branches never see each other's writes -- but branches currently execute one after another rather than truly concurrently.
-- **Fan-In**: The branches "fan in" to a single aggregation node, which runs exactly once after every branch has completed, with each branch's changes merged into the shared state. The main execution path only continues from there.
+- **Fan-Out**: The graph "fans out" from a single node into multiple branches. Each branch runs against its own independently deep-copied state, so mutating a nested value in place (e.g. ``state['messages'].append(...)``) in one branch is never visible to another -- but branches currently execute one after another rather than truly concurrently.
+- **Fan-In**: The branches "fan in" to a single aggregation node, which runs exactly once after every branch has completed. **Branch state is *not* merged automatically.** The aggregation node receives the state exactly as it was the moment the branches forked, plus a ``branch_results`` argument containing every branch's independent final state -- and it decides explicitly what, if anything, to pull out of each branch. The main execution path only continues from there.
 
 .. mermaid::
 
@@ -129,10 +129,12 @@ Orkes supports branching a graph into multiple independent paths, a pattern also
 
 You can implement this using the `add_parallel_edges` method, which splits the execution into multiple paths. All parallel branches must eventually converge into a single `aggregation_node`.
 
+The aggregation node's function **must** accept a second parameter, ``branch_results`` -- a ``dict`` keyed by each branch's entry-node name (the strings passed in ``to_nodes``), mapping to that branch's complete final state. ``compile()`` raises a ``TypeError`` if this parameter is missing, because without it there is no way to tell whether a branch's output was discarded intentionally or by accident. You are not required to *use* ``branch_results`` inside the function -- ``return state`` unchanged is a valid choice if you genuinely don't need branch output -- but the parameter must be declared.
+
 .. code-block:: python
 
+    from typing import TypedDict, Dict
     from orkes.graph.core import OrkesGraph
-    from typing import TypedDict
 
     class ParallelState(TypedDict):
         branch_1_visited: bool
@@ -146,10 +148,15 @@ You can implement this using the `add_parallel_edges` method, which splits the e
         state['branch_2_visited'] = True
         return state
 
-    def aggregation_node(state: ParallelState) -> ParallelState:
-        # This node will only be reached after both branches complete
-        assert state['branch_1_visited']
-        assert state['branch_2_visited']
+    def aggregation_node(
+        state: ParallelState,
+        branch_results: Dict[str, ParallelState]
+    ) -> ParallelState:
+        # `state` is the pre-fork snapshot -- neither branch's write is here
+        # yet. Pull whatever you need explicitly out of `branch_results`,
+        # keyed by the branch's entry node name (matching `to_nodes` below).
+        state['branch_1_visited'] = branch_results['branch_1']['branch_1_visited']
+        state['branch_2_visited'] = branch_results['branch_2']['branch_2_visited']
         return state
 
     graph = OrkesGraph(ParallelState)
@@ -170,3 +177,6 @@ You can implement this using the `add_parallel_edges` method, which splits the e
 
     # Edge from the aggregation node to the end
     graph.add_edge('aggregator', graph.END)
+
+.. note::
+   If two branches write to the *same* state key, there is no automatic conflict resolution -- each branch's contribution only exists inside its own entry in ``branch_results`` until the aggregation node explicitly combines them (e.g. concatenating two lists, picking one, or voting). This is a deliberate design choice: silently picking a winner would make one branch's work vanish with no error and no trace.
