@@ -18,6 +18,10 @@ Key features of the graph architecture include:
 - **Flexible Control Flow**: Orkes supports both simple, unconditional edges for linear workflows and powerful conditional edges for creating branching logic and loops. This allows you to build dynamic and adaptive systems.
 - **Simple, Pythonic Nodes**: Nodes in an Orkes graph are just plain Python functions, making it easy to integrate your existing code and logic into a graph-based workflow.
 
+Async-Native Execution
+-----------------------
+Node and gate functions can be written as ``async def``, and a compiled graph can be executed via ``arun()`` -- Orkes' async-native entry point, alongside the fully synchronous ``run()``. Async functions are awaited natively, not offloaded to a thread pool, so a node can ``await`` an LLM call or any other I/O directly. Sync and async functions can be freely mixed within the same graph. See :ref:`async_execution` for the full guide.
+
 Graph Traceability and Visualization
 ------------------------------------
 Understanding and debugging complex AI workflows is a major challenge. Orkes addresses this with a built-in traceability and visualization system. When you run a graph, Orkes can generate a detailed execution trace that captures the state, timing, and data flow at every step.

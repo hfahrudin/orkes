@@ -7,6 +7,7 @@ schedule
 python-dotenv
 pytest
 pytest-html
+pytest-asyncio
 memory-profiler
 psutil
 sphinxcontrib-mermaid

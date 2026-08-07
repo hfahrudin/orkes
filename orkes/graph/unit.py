@@ -35,6 +35,7 @@ class Node:
         self.graph_state = graph_state
         self.id = "node_" + str(uuid.uuid4())
         self.description = func.__doc__
+        self.is_async = inspect.iscoroutinefunction(func)
         self.node_trace = NodeTrace(
             node_name=self.name,
             node_id=self.id,
@@ -52,9 +53,34 @@ class Node:
 
         Returns:
             Any: The output of the function.
+
+        Raises:
+            RuntimeError: If the node's function is a coroutine function --
+                          use `aexecute` (and `GraphRunner.arun`) instead.
         """
+        if self.is_async:
+            raise RuntimeError(
+                f"Node '{self.name}' has an async function; use arun() instead of run()."
+            )
         output = self.func(input_state)
         return output
+
+    async def aexecute(self, input_state) -> Any:
+        """Executes the node's function, awaiting it if it's a coroutine function.
+
+        Handles sync and async node functions uniformly: a sync function's
+        result is returned as-is, an async function's result is awaited.
+
+        Args:
+            input_state: The input state for the function.
+
+        Returns:
+            Any: The output of the function.
+        """
+        result = self.func(input_state)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
 
     def __repr__(self) -> str:
         return f"Node({self.name})"
@@ -130,6 +156,25 @@ class AggregationNode(Node):
         if self.accepts_branch_results:
             return self.func(input_state, branch_results)
         return self.func(input_state)
+
+    async def aexecute(self, input_state: Any, branch_results: Dict[str, Any] = None) -> Any:
+        """Executes the aggregation function, awaiting it if it's a coroutine function.
+
+        Args:
+            input_state: The state as it was when the parallel branches forked.
+            branch_results (Dict[str, Any]): Each branch's independent final
+                state, keyed by the branch's entry node name.
+
+        Returns:
+            Any: The output of the function.
+        """
+        if self.accepts_branch_results:
+            result = self.func(input_state, branch_results)
+        else:
+            result = self.func(input_state)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
 
 
 class Edge(ABC):
@@ -231,6 +276,7 @@ class ConditionalEdge(Edge):
         super().__init__(from_node, to_node=None, max_passes=max_passes)  # initialize parent part
         self.gate_function = gate_function
         self.condition = condition
+        self.is_async_gate = inspect.iscoroutinefunction(gate_function)
         self.edge_type = "__conditional__"
         self.edge_trace = EdgeTrace(
             edge_id=self.id,

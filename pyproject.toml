@@ -27,6 +27,7 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-html",
+    "pytest-asyncio",
     "memory-profiler",
     "psutil",
     "fastapi",
@@ -46,7 +47,7 @@ docs = [
 
 [project.urls]
 "Homepage" = "https://github.com/hfahrudin/orkes"
-"Documentation" = "https://orkes.readthedocs.io/" 
+"Documentation" = "https://orkes.readthedocs.io/"
 
 [project.scripts]
 orkes = "orkes.cli:main"
@@ -58,3 +59,6 @@ packages = { find = { where = ["."], include = ["orkes*"] } }
 # If you have non-python files (like .json or .yaml) inside your packages, add this:
 [tool.setuptools.package-data]
 "*" = ["*.json", "*.yaml", "*.html"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"

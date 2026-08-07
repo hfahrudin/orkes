@@ -17,7 +17,55 @@ def orkes_tracable(func):
 
     If the function is executed outside of a traced graph run, it will behave
     as if it were not decorated.
+
+    If `func` is a coroutine function (`async def`), the decorated function is
+    also a coroutine function -- `inspect.iscoroutinefunction` reports `True`
+    on the wrapped result, and the wrapped call is awaited before the trace is
+    recorded. This keeps coroutine-ness detectable through the decorator,
+    which matters for anything (e.g. the graph runner) that branches on
+    `inspect.iscoroutinefunction` to decide whether a function needs to be
+    awaited.
     """
+    def _build_trace(result, args, kwargs, elapsed):
+        # Attempt to create the trace object once
+        try:
+            return FunctionTraceSchema(
+                function_name=func.__name__,
+                input_args=args,
+                input_kwargs=kwargs,
+                return_value=result, # Try original result
+                elapsed=elapsed
+            )
+        except Exception:
+            # Fallback if result isn't serializable
+            return FunctionTraceSchema(
+                function_name=func.__name__,
+                input_args=args,
+                input_kwargs=kwargs,
+                return_value=str(result),
+                elapsed=elapsed
+            )
+
+    if inspect.iscoroutinefunction(func):
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            edge_trace = edge_trace_var.get()
+            if not edge_trace:
+                return await func(*args, **kwargs)
+
+            start_time = time.time()
+            result = await func(*args, **kwargs)
+            elapsed = time.time() - start_time
+
+            function_trace = _build_trace(result, args, kwargs, elapsed)
+
+            if edge_trace.function_traces is None:
+                edge_trace.function_traces = []
+
+            edge_trace.function_traces.append(function_trace)
+            return result
+        return async_wrapper
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         edge_trace = edge_trace_var.get()
@@ -28,24 +76,7 @@ def orkes_tracable(func):
         result = func(*args, **kwargs)
         elapsed = time.time() - start_time
 
-        # Attempt to create the trace object once
-        try:
-            function_trace = FunctionTraceSchema(
-                function_name=func.__name__,
-                input_args=args,
-                input_kwargs=kwargs,
-                return_value=result, # Try original result
-                elapsed=elapsed
-            )
-        except Exception:
-            # Fallback if result isn't serializable
-            function_trace = FunctionTraceSchema(
-                function_name=func.__name__,
-                input_args=args,
-                input_kwargs=kwargs,
-                return_value=str(result),
-                elapsed=elapsed
-            )
+        function_trace = _build_trace(result, args, kwargs, elapsed)
 
         if edge_trace.function_traces is None:
             edge_trace.function_traces = []

@@ -69,6 +69,25 @@ class GraphRunner:
         self.run_number = 0
         self.auto_save_trace = auto_save_trace
         self._pending_branch_results = None
+        self._running = False
+        self.has_async_components = self._compute_has_async_components(nodes_pool)
+
+    @staticmethod
+    def _compute_has_async_components(nodes_pool: Dict[str, NodePoolItem]) -> bool:
+        """Checks whether any node function or conditional gate function in the
+        graph is a coroutine function.
+
+        Computed once at init so `run()` can fail fast -- before touching
+        `self.graph_state` -- rather than discovering the mismatch deep inside
+        execution after earlier nodes have already mutated state.
+        """
+        for node_pool_item in nodes_pool.values():
+            if node_pool_item.node.is_async:
+                return True
+            edge = node_pool_item.edge
+            if isinstance(edge, ConditionalEdge) and edge.is_async_gate:
+                return True
+        return False
 
     def save_run_trace(self):
         """Saves the execution trace to a JSON file."""
@@ -101,37 +120,115 @@ class GraphRunner:
 
         Raises:
             KeyError: If the invoke_state contains keys not defined in the graph's state.
+            RuntimeError: If the graph contains an async node/gate function --
+                          use `arun()` instead. Also raised if this instance is
+                          already executing a run -- each concurrent execution
+                          needs its own `compile()`'d instance.
         """
-        # Check that all keys in invoke_state exist in graph_state
-        missing_keys = [key for key in invoke_state if key not in self.state_def.__annotations__]
+        if self.has_async_components:
+            raise RuntimeError(
+                "This graph contains an async node function or async conditional "
+                "gate function; use arun() instead of run()."
+            )
+        if self._running:
+            raise RuntimeError(
+                "This GraphRunner instance is already executing a run; each "
+                "concurrent execution needs its own compile()'d instance -- "
+                "e.g. [graph.compile() for _ in range(n)], not one instance "
+                "reused across concurrent run()/arun() calls."
+            )
+        self._running = True
+        try:
+            # Check that all keys in invoke_state exist in graph_state
+            missing_keys = [key for key in invoke_state if key not in self.state_def.__annotations__]
 
-        if missing_keys:
-            raise KeyError(f"The following items are missing in self.graph_state: {missing_keys}")
+            if missing_keys:
+                raise KeyError(f"The following items are missing in self.graph_state: {missing_keys}")
 
-        # Merge invoke_state into a copy of graph_state (avoid mutating original)
-        self.graph_state = invoke_state
-        input_state = self.graph_state.copy()
+            # Merge invoke_state into a copy of graph_state (avoid mutating original)
+            self.graph_state = invoke_state
+            input_state = self.graph_state.copy()
 
-        # Start traversal from the START node
-        start_pool = self.nodes_pool['START']
-        start_edges = start_pool.edge
+            # Start traversal from the START node
+            start_pool = self.nodes_pool['START']
+            start_edges = start_pool.edge
 
-        if self.traced:
-            self.trace.start_time = time.time()
-            token = trace_var.set(self.trace)
-            try:
+            if self.traced:
+                self.trace.start_time = time.time()
+                token = trace_var.set(self.trace)
+                try:
+                    self.traverse_graph(start_edges, input_state)
+                finally:
+                    trace_var.reset(token)
+
+                self.trace.elapsed_time = time.time() - self.trace.start_time
+                self.trace.status = "FINISHED"
+                if self.auto_save_trace:
+                    self.save_run_trace()
+            else:
                 self.traverse_graph(start_edges, input_state)
-            finally:
-                trace_var.reset(token)
 
-            self.trace.elapsed_time = time.time() - self.trace.start_time
-            self.trace.status = "FINISHED"
-            if self.auto_save_trace:
-                self.save_run_trace()
-        else:
-            self.traverse_graph(start_edges, input_state)
+            return self.graph_state
+        finally:
+            self._running = False
 
-        return self.graph_state
+    async def arun(self, invoke_state: Dict) -> Dict:
+        """Runs the graph asynchronously with a given initial state.
+
+        Unlike `run()`, this works for graphs with sync-only, async-only, or
+        mixed node/gate functions -- sync functions are called directly (not
+        offloaded to a thread), async functions are awaited.
+
+        Args:
+            invoke_state (Dict): The initial state to run the graph with.
+
+        Returns:
+            Dict: The final state of the graph after execution.
+
+        Raises:
+            KeyError: If the invoke_state contains keys not defined in the graph's state.
+            RuntimeError: If this instance is already executing a run -- each
+                          concurrent execution needs its own `compile()`'d
+                          instance.
+        """
+        if self._running:
+            raise RuntimeError(
+                "This GraphRunner instance is already executing a run; each "
+                "concurrent execution needs its own compile()'d instance -- "
+                "e.g. [graph.compile() for _ in range(n)], not one instance "
+                "reused across concurrent run()/arun() calls."
+            )
+        self._running = True
+        try:
+            missing_keys = [key for key in invoke_state if key not in self.state_def.__annotations__]
+
+            if missing_keys:
+                raise KeyError(f"The following items are missing in self.graph_state: {missing_keys}")
+
+            self.graph_state = invoke_state
+            input_state = self.graph_state.copy()
+
+            start_pool = self.nodes_pool['START']
+            start_edges = start_pool.edge
+
+            if self.traced:
+                self.trace.start_time = time.time()
+                token = trace_var.set(self.trace)
+                try:
+                    await self.atraverse_graph(start_edges, input_state)
+                finally:
+                    trace_var.reset(token)
+
+                self.trace.elapsed_time = time.time() - self.trace.start_time
+                self.trace.status = "FINISHED"
+                if self.auto_save_trace:
+                    self.save_run_trace()
+            else:
+                await self.atraverse_graph(start_edges, input_state)
+
+            return self.graph_state
+        finally:
+            self._running = False
 
     def traverse_graph(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict, stop_node_name: Optional[str] = None):
         """Traverses the graph, either with or without tracing.
@@ -193,6 +290,144 @@ class GraphRunner:
                 self.graph_state = outer_graph_state
 
         return branch_results
+
+    async def _aexecute_node(self, node, input_state) -> Dict:
+        """Async counterpart to `_execute_node` -- awaits `node.aexecute(...)`,
+        which itself handles sync and async node functions uniformly.
+        """
+        if isinstance(node, AggregationNode):
+            branch_results = self._pending_branch_results
+            self._pending_branch_results = None
+            return await node.aexecute(input_state, branch_results)
+        return await node.aexecute(input_state)
+
+    async def _arun_parallel_branches(self, current_edge) -> Dict[str, Dict]:
+        """Async counterpart to `_run_parallel_branches`.
+
+        Branches are still awaited one at a time, sequentially -- not via
+        `asyncio.gather` -- so the existing swap-and-restore pattern on
+        `self.graph_state` remains valid without further changes. True
+        concurrent branch execution would require refactoring away from this
+        shared-instance-state model and is out of scope here.
+        """
+        base_state = copy.deepcopy(self.graph_state)
+        branch_results = {}
+        for to_node_item in current_edge.to_nodes:
+            branch_start_edge = self.nodes_pool[to_node_item.node.name].edge
+            outer_graph_state = self.graph_state
+            self.graph_state = copy.deepcopy(base_state)
+            try:
+                await self.atraverse_graph(branch_start_edge, self.graph_state.copy(), stop_node_name=current_edge.aggregation_node.node.name)
+                branch_results[to_node_item.node.name] = self.graph_state
+            finally:
+                self.graph_state = outer_graph_state
+
+        return branch_results
+
+    async def atraverse_graph(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict, stop_node_name: Optional[str] = None):
+        """Async counterpart to `traverse_graph`.
+
+        A single method that branches internally on `self.traced` for the
+        tracing-only bookkeeping, mirroring the shape of `_traverse_traced`
+        while folding in the untraced case as a conditional -- rather than
+        duplicating both existing sync methods into separate async copies.
+
+        Args:
+            current_edge (Union[ForwardEdge, ConditionalEdge]): The edge to start traversal from.
+            input_state (Dict): The current state of the graph.
+            stop_node_name (Optional[str]): The name of the node at which to stop traversal.
+
+        Raises:
+            RuntimeError: If an edge is traversed more than the maximum allowed times.
+        """
+        while True:
+            current_node = current_edge.from_node.node
+            if stop_node_name and current_node.name == stop_node_name:
+                return
+
+            edge_token = edge_id_var.set(current_edge.id) if self.traced else None
+            try:
+                current_edge.passes += 1
+                if current_edge.passes > current_edge.max_passes:
+                    raise RuntimeError(
+                        f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
+                        "exceeding the allowed maximum without reaching a stop condition."
+                    )
+
+                edge_trace = None
+                edge_trace_token = None
+                start = None
+                if self.traced:
+                    self.run_number += 1
+                    edge_trace = current_edge.edge_trace.model_copy()
+                    edge_trace.edge_run_number = self.run_number
+                    edge_trace.passes_left = current_edge.max_passes - current_edge.passes
+                    start = time.time()
+                    edge_trace.state_snapshot = input_state.copy()
+                    edge_trace_token = edge_trace_var.set(edge_trace)
+
+                try:
+                    if current_edge.edge_type == "__forward__":
+                        if not isinstance(current_node, _StartNode):
+                            result = await self._aexecute_node(current_node, input_state)
+                            self.graph_state.update(result)
+
+                        next_edge = current_edge.to_node.edge
+                        next_node = current_edge.to_node.node
+                    elif current_edge.edge_type == "__conditional__":
+                        result = await self._aexecute_node(current_node, input_state)
+                        self.graph_state.update(result)
+
+                        gate_function = current_edge.gate_function
+                        condition = current_edge.condition
+                        if current_edge.is_async_gate:
+                            result_gate = await gate_function(self.graph_state)
+                        else:
+                            result_gate = gate_function(self.graph_state)
+                        if result_gate not in condition:
+                            raise KeyError(
+                                f"Gate function on node '{current_node.name}' returned {result_gate!r}, "
+                                f"which is not a valid key in its condition map {list(condition.keys())}."
+                            )
+
+                        next_node_name = condition[result_gate]
+
+                        next_node = self.nodes_pool[next_node_name].node
+                        next_edge = self.nodes_pool[next_node_name].edge
+                        if self.traced:
+                            edge_trace.to_node = next_node_name
+                    elif current_edge.edge_type == "__parallel__":
+                        if not isinstance(current_node, _StartNode):
+                            result = await self._aexecute_node(current_node, input_state)
+                            self.graph_state.update(result)
+
+                        if self.traced:
+                            # Record the parallel branch starting points in the trace
+                            edge_trace.to_node = [node_item.node.name for node_item in current_edge.to_nodes]
+                            edge_trace.meta["aggregation_node"] = current_edge.aggregation_node.node.name
+
+                        self._pending_branch_results = await self._arun_parallel_branches(current_edge)
+
+                        # After all parallel branches are (sequentially) traversed,
+                        # the control flow should move to the aggregation node.
+                        next_node = current_edge.aggregation_node.node
+                        next_edge = current_edge.aggregation_node.edge
+                finally:
+                    if self.traced:
+                        edge_trace_var.reset(edge_trace_token)
+
+                if self.traced:
+                    edge_trace.elapsed = time.time() - start
+                    self.trace.edges_trace.append(edge_trace)
+            finally:
+                if self.traced:
+                    edge_id_var.reset(edge_token)
+
+            if isinstance(next_node, _EndNode):
+                return
+
+            current_edge = next_edge
+            input_state = self.graph_state.copy()
 
     def _traverse_untraced(self, current_edge: Union[ForwardEdge, ConditionalEdge], input_state: Dict, stop_node_name: Optional[str] = None):
         """Iteratively traverses the graph without tracing.
