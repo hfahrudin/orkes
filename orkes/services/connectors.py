@@ -7,6 +7,7 @@ from orkes.services.schema import LLMInterface, OrkesToolSchema
 from orkes.shared.schema import OrkesMessagesSchema, to_dict
 from orkes.shared.context import edge_trace_var
 from orkes.graph.schema import LLMTraceSchema
+from orkes.shared.schema import RequestSchema
 from orkes.shared.utils import callable_to_orkes_tool_schema
 
 class LLMConfig:
@@ -23,6 +24,8 @@ class LLMConfig:
         headers (Dict[str, str]): A dictionary of extra headers to send with each request.
         default_params (Dict[str, Any]): A dictionary of default parameters to use for
                                        all requests, such as temperature and max_tokens.
+        timeout (float): Seconds to wait for the provider to connect or send data
+                         before giving up, so a stuck provider can't hang a graph.
     """
     def __init__(
         self,
@@ -30,7 +33,8 @@ class LLMConfig:
         base_url: str,
         model: str,
         extra_headers: Optional[Dict[str, str]] = None,
-        default_params: Optional[Dict[str, Any]] = None
+        default_params: Optional[Dict[str, Any]] = None,
+        timeout: float = 600.0
     ):
         """Initializes the LLMConfig object.
 
@@ -42,16 +46,19 @@ class LLMConfig:
                 headers to send with each request. Defaults to None.
             default_params (Optional[Dict[str, Any]], optional): A dictionary of default
                 parameters to use for all requests. Defaults to a standard set of
-                parameters.
+                parameters; pass `{}` to send none.
+            timeout (float, optional): Seconds to wait for the provider to connect
+                or send data. Defaults to 600 (10 minutes), since a non-streaming
+                reply sends nothing until it is complete.
         """
         self.api_key = api_key
         self.base_url = base_url.rstrip('/')
         self.model = model
         self.headers = extra_headers or {}
-        self.default_params = default_params or {
-            "temperature": 0.7,
-            "max_tokens": 1024
-        }
+        if default_params is None:
+            default_params = {"temperature": 0.7, "max_tokens": 1024}
+        self.default_params = default_params
+        self.timeout = timeout
 
 
 class UniversalLLMClient(LLMInterface):
@@ -135,7 +142,7 @@ class UniversalLLMClient(LLMInterface):
 
         edge_trace = edge_trace_var.get()
 
-        response = requests.post(full_url, headers=self.session_headers, json=payload)
+        response = requests.post(full_url, headers=self.session_headers, json=payload, timeout=self.config.timeout)
         response.raise_for_status()
         data = response.json()
         parsed_response = self.provider.parse_response(data)
@@ -197,41 +204,63 @@ class UniversalLLMClient(LLMInterface):
                 else:
                     processed_tools.append(tool)
 
+        settings = self._merge_settings(kwargs)
         payload = self.provider.prepare_payload(
             self.config.model,
             messages,
             stream=True,
-            settings=self._merge_settings(kwargs),
+            settings=settings,
             tools=processed_tools if len(processed_tools) > 0 else None
         )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(full_url, headers=self.session_headers, json=payload) as response:
-                response.raise_for_status()
-                async for line in response.content:
-                    if connection and hasattr(connection, 'is_disconnected'):
-                        if await connection.is_disconnected():
-                            break
+        # Per-read timeout rather than a total one, so long streams that keep
+        # sending data aren't cut off.
+        timeout = aiohttp.ClientTimeout(total=None, sock_connect=self.config.timeout, sock_read=self.config.timeout)
+        edge_trace = edge_trace_var.get()
+        chunks = []
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(full_url, headers=self.session_headers, json=payload) as response:
+                    response.raise_for_status()
+                    async for line in response.content:
+                        if connection and hasattr(connection, 'is_disconnected'):
+                            if await connection.is_disconnected():
+                                break
 
-                    decoded_line = line.decode('utf-8').strip()
-                    if not decoded_line:
-                        continue
-                    text_chunk = self.provider.parse_stream_chunk(decoded_line)
-                    if text_chunk:
-                        yield text_chunk
+                        decoded_line = line.decode('utf-8').strip()
+                        if not decoded_line:
+                            continue
+                        text_chunk = self.provider.parse_stream_chunk(decoded_line)
+                        if text_chunk:
+                            chunks.append(text_chunk)
+                            yield text_chunk
+        finally:
+            # Recorded even if the stream stops early, with the text received so far.
+            if edge_trace and chunks:
+                edge_trace.llm_traces.append(LLMTraceSchema(
+                    messages=messages,
+                    tools=[
+                        to_dict(t, exclude=("function",)) if is_dataclass(t) else t
+                        for t in processed_tools
+                    ] or None,
+                    parsed_response=RequestSchema(content_type="message", content="".join(chunks)),
+                    model=self.config.model,
+                    settings=settings
+                ))
 
-    def health_check(self, endpoint: str = "/health") -> bool:
+    def health_check(self, endpoint: str = "/models") -> bool:
         """Performs a health check on the LLM provider.
 
         Args:
-            endpoint (str, optional): The health check endpoint. Defaults to "/health".
+            endpoint (str, optional): The health check endpoint. Defaults to
+                "/models", which OpenAI, Anthropic, Gemini and vLLM all serve.
 
         Returns:
             bool: True if the provider is healthy, False otherwise.
         """
         try:
             full_url = f"{self.config.base_url}{endpoint}"
-            response = requests.get(full_url, headers=self.session_headers)
+            response = requests.get(full_url, headers=self.session_headers, timeout=self.config.timeout)
             return response.status_code == 200
         except requests.RequestException:
             return False
@@ -277,31 +306,37 @@ class LLMFactory:
         Returns:
             UniversalLLMClient: A client configured for the OpenAI API.
         """
+        # OpenAI's newer models reject `max_tokens` and non-default `temperature`,
+        # so only the cap they all accept is set.
         config = LLMConfig(
             api_key=api_key,
             base_url=base_url,
-            model=model
+            model=model,
+            default_params={"max_completion_tokens": 1024}
         )
         return UniversalLLMClient(config, OpenAIStyleStrategy())
 
     @staticmethod
-    def create_anthropic(api_key: str, model: str = "claude-3-opus-20240229", base_url: str = "https://api.anthropic.com/v1") -> UniversalLLMClient:
+    def create_anthropic(api_key: str, model: str = "claude-opus-5-5", base_url: str = "https://api.anthropic.com/v1") -> UniversalLLMClient:
         """Creates a client for the Anthropic API.
 
         Args:
             api_key (str): The Anthropic API key.
             model (str, optional): The name of the model to use. Defaults to
-                "claude-3-opus-20240229".
+                "claude-opus-5-5".
             base_url (str, optional): The base URL of the Anthropic API. Defaults to
                 "https://api.anthropic.com/v1".
 
         Returns:
             UniversalLLMClient: A client configured for the Anthropic API.
         """
+        # `max_tokens` is required by Anthropic. Current Claude models reject
+        # non-default sampling settings, so `temperature` is not set.
         config = LLMConfig(
             api_key=api_key,
             base_url=base_url,
-            model=model
+            model=model,
+            default_params={"max_tokens": 16000}
         )
         return UniversalLLMClient(config, AnthropicStrategy())
 

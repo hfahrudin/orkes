@@ -119,4 +119,4 @@ Here's how you can achieve the same ``get_weather`` tool definition using a Pyth
         final = openai_client.send_message(messages, tools=[get_weather])
         print(final["content"]["content"])
 
-This round trip works the same way with the OpenAI-style and Anthropic clients; Orkes converts the tool-call and tool-result messages into each provider's own format. Sending tool results back to Gemini is not supported yet.
+This round trip works the same way with the OpenAI-style, Anthropic and Gemini clients; Orkes converts the tool-call and tool-result messages into each provider's own format.

@@ -480,3 +480,163 @@ def test_aggregation_node_reentered_gets_empty_branch_results():
     result = g.compile().run({"n": 0, "items": []})
     assert seen == [["a", "b"], []]  # via the fork, then the loop back
     assert result["items"] == [2, 0]
+
+
+# --- Gemini, Anthropic system prompts, LLM defaults ---------------------------
+
+def test_gemini_system_prompt_is_a_system_instruction():
+    """System messages used to be sent as 'model' turns, as if the model had said them."""
+    from orkes.shared.schema import OrkesMessagesSchema
+    from orkes.services.strategies import GoogleGeminiStrategy
+
+    messages = OrkesMessagesSchema(messages=[
+        {"role": "system", "content": "be brief"},
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "hello"},
+    ])
+    payload = GoogleGeminiStrategy().get_messages_payload(messages)
+    assert payload["system_instruction"] == {"parts": [{"text": "be brief"}]}
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "hi"}]},
+        {"role": "model", "parts": [{"text": "hello"}]},
+    ]
+
+
+def test_gemini_tool_round_trip_payload():
+    from orkes.services.strategies import GoogleGeminiStrategy
+
+    payload = GoogleGeminiStrategy().get_messages_payload(_tool_round_trip_messages())
+    assert payload["system_instruction"] == {"parts": [{"text": "be brief"}]}
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "weather and time?"}]},
+        {"role": "model", "parts": [
+            {"functionCall": {"name": "get_weather", "args": {"city": "SF"}, "id": "call_1"}},
+            {"functionCall": {"name": "get_time", "args": {}, "id": "call_2"}},
+        ]},
+        # results matched to their function by call id, grouped in one turn
+        {"role": "user", "parts": [
+            {"functionResponse": {"name": "get_weather", "response": {"result": "sunny"}, "id": "call_1"}},
+            {"functionResponse": {"name": "get_time", "response": {"result": "noon"}, "id": "call_2"}},
+        ]},
+    ]
+
+
+def test_all_system_messages_are_kept():
+    """Anthropic used to keep only the first system message."""
+    from orkes.shared.schema import OrkesMessagesSchema
+    from orkes.services.strategies import AnthropicStrategy, GoogleGeminiStrategy
+
+    messages = OrkesMessagesSchema(messages=[
+        {"role": "system", "content": "be brief"},
+        {"role": "system", "content": "answer in French"},
+        {"role": "user", "content": "hi"},
+    ])
+    assert AnthropicStrategy().get_messages_payload(messages)["system"] == "be brief\n\nanswer in French"
+    gemini = GoogleGeminiStrategy().get_messages_payload(messages)
+    assert gemini["system_instruction"]["parts"][0]["text"] == "be brief\n\nanswer in French"
+
+
+def test_factory_defaults_avoid_rejected_settings():
+    """Newer OpenAI models reject `max_tokens`; current Claude models reject
+    non-default `temperature`; the old Claude default model is retired."""
+    from orkes.services.connectors import LLMFactory
+
+    openai = LLMFactory.create_openai(api_key="k")
+    assert openai.config.default_params == {"max_completion_tokens": 1024}
+
+    anthropic = LLMFactory.create_anthropic(api_key="k")
+    assert anthropic.config.model == "claude-opus-5-5"
+    assert anthropic.config.default_params == {"max_tokens": 16000}
+
+
+def test_empty_default_params_means_none():
+    from orkes.services.connectors import LLMConfig
+
+    assert LLMConfig(api_key="k", base_url="u", model="m", default_params={}).default_params == {}
+
+
+def test_requests_use_a_timeout():
+    """Requests had no timeout, so a stuck provider could hang a graph forever."""
+    from orkes.services.connectors import LLMFactory
+    from orkes.shared.schema import OrkesMessagesSchema
+
+    client = LLMFactory.create_openai(api_key="k")
+    response = mock.Mock()
+    response.raise_for_status = lambda: None
+    response.json = lambda: {"choices": [{"message": {"role": "assistant", "content": "ok"}}]}
+    with mock.patch("orkes.services.connectors.requests.post", return_value=response) as post, \
+            mock.patch("orkes.services.connectors.requests.get", return_value=mock.Mock(status_code=200)) as get:
+        client.send_message(OrkesMessagesSchema(messages=[{"role": "user", "content": "hi"}]))
+        assert client.health_check()
+    assert post.call_args.kwargs["timeout"] == 600.0
+    assert get.call_args.kwargs["timeout"] == 600.0
+    assert get.call_args.args[0].endswith("/models")
+
+
+@pytest.mark.asyncio
+async def test_streamed_llm_call_is_traced():
+    """Streaming calls were never recorded in the trace."""
+    from orkes.services.connectors import LLMFactory
+    from orkes.shared.schema import OrkesMessagesSchema
+
+    client = LLMFactory.create_openai(api_key="k")
+    lines = [
+        b'data: {"choices": [{"delta": {"content": "Hel"}}]}\n',
+        b'data: {"choices": [{"delta": {"content": "lo"}}]}\n',
+        b'data: [DONE]\n',
+    ]
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        @property
+        def content(self):
+            async def gen():
+                for line in lines:
+                    yield line
+            return gen()
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class FakeSession:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def post(self, *args, **kwargs):
+            return FakeResponse()
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    async def node(s: S):
+        text = ""
+        async for chunk in client.stream_message(OrkesMessagesSchema(messages=[{"role": "user", "content": "hi"}])):
+            text += chunk
+        s["items"] = [text]
+        return s
+
+    runner = _linear_graph(node).compile()
+    with mock.patch("orkes.services.connectors.aiohttp.ClientSession", FakeSession):
+        result = await runner.arun({"n": 0, "items": []})
+
+    assert result["items"] == ["Hello"]
+    [llm_trace] = runner.trace.edges_trace[1].llm_traces
+    assert llm_trace.parsed_response.content == "Hello"
+
+
+def test_loop_limit_error_names_the_nodes():
+    """The error used to show only a random edge id."""
+    g = OrkesGraph(S)
+    g.add_node("loop", _inc)
+    g.add_edge(g.START, "loop")
+    g.add_conditional_edge("loop", lambda s: "again", {"again": "loop", "done": "END"}, max_passes=3)
+    with pytest.raises(RuntimeError, match=r"conditional edge from 'loop' .* limit of 3"):
+        g.compile().run({"n": 0, "items": []})

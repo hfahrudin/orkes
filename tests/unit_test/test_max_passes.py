@@ -37,7 +37,7 @@ def test_max_passes_allows_exactly_max_passes_executions():
 
 def test_max_passes_error_message_reports_actual_limit():
     app = build_looping_graph(max_passes=3)
-    with pytest.raises(RuntimeError, match="passed 3 times"):
+    with pytest.raises(RuntimeError, match=r"edge from 'increment' .* max_passes limit of 3"):
         app.run({'count': 0})
     assert app.graph_state['count'] == 3
 

@@ -26,6 +26,15 @@ def _snapshot(state: Dict) -> Dict:
         return dict(state)
 
 
+def _describe_edge(edge) -> str:
+    """A readable name for an edge, e.g. "conditional edge from 'loop'"."""
+    kind = (edge.edge_type or "").strip("_")
+    from_name = edge.from_node.node.name
+    if edge.to_node is not None:
+        return f"{kind} edge '{from_name}' -> '{edge.to_node.node.name}'"
+    return f"{kind} edge from '{from_name}'"
+
+
 def _format_error(error: BaseException) -> str:
     return f"{type(error).__name__}: {error}"
 
@@ -144,8 +153,9 @@ class GraphRunner:
         passes = self._edge_passes.get(edge.id, 0) + 1
         if passes > edge.max_passes:
             raise RuntimeError(
-                f"Edge '{edge.id}' has been passed {edge.max_passes} times, "
-                "exceeding the allowed maximum without reaching a stop condition."
+                f"The {_describe_edge(edge)} was traversed more than its max_passes "
+                f"limit of {edge.max_passes} without reaching a stop condition. "
+                f"Check the loop's exit condition, or raise max_passes if it needs more passes."
             )
         self._edge_passes[edge.id] = passes
         return passes

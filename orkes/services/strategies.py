@@ -6,6 +6,12 @@ from typing import Union
 from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema, OrkesToolSchema
 
 
+def _system_text(messages: OrkesMessagesSchema) -> Optional[str]:
+    """All system messages joined into one system prompt, or None if there are none."""
+    parts = [msg.content for msg in messages.messages if msg.role == "system" and msg.content]
+    return "\n\n".join(parts) if parts else None
+
+
 def _tool_calls(msg: OrkesMessageSchema) -> Optional[List[Dict]]:
     """Returns the tool calls carried by an assistant message, as dicts with
     `function_name`, `arguments` and `id`, or None if it doesn't carry any."""
@@ -183,7 +189,7 @@ class AnthropicStrategy(LLMProviderStrategy):
         Returns:
             Dict[str, Union[str, List[Dict]]]: The messages in the provider's format.
         """
-        system_msg = next((msg.content for msg in messages.messages if msg.role == 'system'), None)
+        system_msg = _system_text(messages)
 
         chat_messages = []
         for msg in messages.messages:
@@ -346,16 +352,44 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
         Returns:
             Dict[str, List[Dict]]: The messages in the provider's format.
         """
-        processed_messages = [to_dict(msg) for msg in messages.messages]
+        contents = []
+        call_names = {}  # tool call id -> function name, for matching results
+        for msg in messages.messages:
+            if msg.role == "system":
+                continue  # sent as the system instruction instead
+            calls = _tool_calls(msg)
+            if calls is not None:
+                parts = []
+                for call in calls:
+                    function_call = {"name": call["function_name"], "args": call.get("arguments", {})}
+                    if call.get("id") is not None:
+                        function_call["id"] = call["id"]
+                        call_names[call["id"]] = call["function_name"]
+                    parts.append({"functionCall": function_call})
+                contents.append({"role": "model", "parts": parts})
+            elif msg.role == "tool":
+                function_response = {
+                    "name": call_names.get(msg.tool_call_id, ""),
+                    "response": {"result": msg.content},
+                }
+                if msg.tool_call_id is not None:
+                    function_response["id"] = msg.tool_call_id
+                part = {"functionResponse": function_response}
+                last = contents[-1] if contents else None
+                # Results of one turn's parallel calls go together in one user turn.
+                if last and last["role"] == "user" and all("functionResponse" in p for p in last["parts"]):
+                    last["parts"].append(part)
+                else:
+                    contents.append({"role": "user", "parts": [part]})
+            else:
+                role = "model" if msg.role == "assistant" else "user"
+                contents.append({"role": role, "parts": [{"text": msg.content or ""}]})
 
-        gemini_contents = []
-        for msg in processed_messages:
-            role = "user" if msg['role'] == "user" else "model"
-            gemini_contents.append({
-                "role": role,
-                "parts": [{"text": msg['content']}]
-            })
-        return {"contents": gemini_contents}
+        payload = {"contents": contents}
+        system_text = _system_text(messages)
+        if system_text:
+            payload["system_instruction"] = {"parts": [{"text": system_text}]}
+        return payload
 
     def get_tools_payload(self, tools: List[OrkesToolSchema]) -> List[Dict]:
         """Converts a list of OrkesToolSchema objects into the format expected by the
