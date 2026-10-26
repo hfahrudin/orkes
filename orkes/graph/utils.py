@@ -1,4 +1,5 @@
 import inspect
+import typing
 from typing import Callable
 from functools import wraps
 import time
@@ -87,21 +88,32 @@ def orkes_tracable(func):
 
 def function_assertion(func: Callable, expected_type: type) -> bool:
     """
-    Asserts that a function has at least one parameter with the expected type annotation.
+    Checks that a function can take the graph state.
+
+    Accepts a function with a parameter annotated as `expected_type` (also when
+    written as a string, e.g. under `from __future__ import annotations`), or
+    one whose first parameter has no annotation at all (e.g. a lambda).
 
     Args:
         func (Callable): The function to inspect.
         expected_type (type): The expected type annotation.
 
     Returns:
-        bool: True if a parameter with the expected type is found, False otherwise.
+        bool: True if the function can take the state, False otherwise.
     """
-    sig = inspect.signature(func)
-    for param in sig.parameters.values():
-        if param.annotation is not inspect._empty:
-            if param.annotation == expected_type:
-                return True
-    return False
+    params = list(inspect.signature(func).parameters.values())
+    try:
+        hints = typing.get_type_hints(func)
+    except Exception:
+        # Unresolvable string annotations (e.g. a class defined inside a function).
+        hints = {}
+    for param in params:
+        annotation = hints.get(param.name, param.annotation)
+        if annotation == expected_type:
+            return True
+        if isinstance(annotation, str) and annotation == expected_type.__name__:
+            return True
+    return bool(params) and params[0].annotation is inspect.Parameter.empty
 
 def is_typeddict_class(obj) -> bool:
     """

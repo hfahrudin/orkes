@@ -101,13 +101,6 @@ def test_complex_graph_can_still_run_via_run_after_the_change(complex_graph_runn
     expected shape, not business-logic values the aggregators intentionally
     discard.
     """
-    # Re-running mutates instance state (run_number, trace, passes on each
-    # edge) -- reset the per-edge pass counters the same way the statebloat
-    # benchmark does between iterations, so max_passes isn't hit early.
-    for node_pool_item in complex_graph_runner.nodes_pool.values():
-        if node_pool_item.edge is not None and hasattr(node_pool_item.edge, "passes"):
-            node_pool_item.edge.passes = 0
-
     fresh_state = {
         "main_counter": 0,
         "branch_a_counter": 0,

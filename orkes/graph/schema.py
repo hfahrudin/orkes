@@ -107,6 +107,8 @@ class EdgeTrace(BaseModel):
         function_traces (list[FunctionTraceSchema]): A list of function traces
                                                      that occurred during this
                                                      edge's execution.
+        error (str | None): The exception raised while traversing this edge,
+            as "ExceptionType: message", or None if it succeeded.
     """
     edge_id: str
     edge_run_number: int
@@ -119,6 +121,7 @@ class EdgeTrace(BaseModel):
     meta: dict
     function_traces: List[FunctionTraceSchema] = []
     llm_traces: List[LLMTraceSchema] = []
+    error: Optional[str] = None
 
 
 class TracesSchema(BaseModel):
@@ -139,6 +142,8 @@ class TracesSchema(BaseModel):
         status (str): Final execution status (e.g., "SUCCESS", "FAILED").
         nodes_trace (list[NodeTrace]): Traces for all nodes executed during the run.
         edges_trace (list[EdgeTrace]): Traces for all edges traversed during the run.
+        error (str | None): The exception that failed the run, as
+            "ExceptionType: message", or None if it finished.
     """
     graph_name : str
     graph_description: str
@@ -148,3 +153,4 @@ class TracesSchema(BaseModel):
     status: str = "FAILED"
     nodes_trace: list[NodeTrace]
     edges_trace: list[EdgeTrace]
+    error: Optional[str] = None

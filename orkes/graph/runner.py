@@ -5,12 +5,37 @@ import json
 import time
 import uuid
 import os
+from collections.abc import Mapping
 from typing import Dict, Union, Optional
 from orkes.graph.unit import ForwardEdge, ConditionalEdge
 from orkes.graph.schema import NodePoolItem, TracesSchema
 from orkes.graph.unit import _EndNode, _StartNode, AggregationNode
 from orkes.visualizer.generator import TraceInspector
 from orkes.shared.context import trace_var, edge_id_var, edge_trace_var
+
+
+def _snapshot(state: Dict) -> Dict:
+    """Copies state for a trace snapshot, deep so later in-place changes by
+    other nodes don't alter it. Falls back to a shallow copy for state that
+    can't be deep-copied (e.g. holds a lock or client object)."""
+    try:
+        return copy.deepcopy(state)
+    except Exception:
+        return dict(state)
+
+
+def _format_error(error: BaseException) -> str:
+    return f"{type(error).__name__}: {error}"
+
+
+def _check_node_result(node, result) -> Dict:
+    """Ensures a node returned a dict of state, with a clear error if not."""
+    if not isinstance(result, Mapping):
+        raise TypeError(
+            f"Node '{node.name}' must return the state dict (or a dict of updates), "
+            f"got {type(result).__name__}."
+        )
+    return result
 
 class GraphRunner:
     """Executes a compiled OrkesGraph, managing state and tracing the execution.
@@ -56,21 +81,85 @@ class GraphRunner:
         self.trace = None
         self.trace_inspector = None
         if self.traced:
-            self.trace = TracesSchema(
-                run_id=self.run_id,
-                graph_name=self.graph_name,
-                graph_description=self.graph_description,
-                nodes_trace=[v.node.node_trace for k, v in nodes_pool.items()],
-                edges_trace=[]
-            )
+            self.trace = self._new_trace()
             self.trace_inspector = TraceInspector()
 
         self.traces_dir = traces_dir
         self.run_number = 0
         self.auto_save_trace = auto_save_trace
         self._pending_branch_results = None
+        # Per-run pass count for each edge, keyed by edge id. Kept on the
+        # runner (not on the shared Edge objects) so separate compile()'d
+        # runners and sequential runs never share counters.
+        self._edge_passes: Dict[str, int] = {}
         self._running = False
         self.has_async_components = self._compute_has_async_components(nodes_pool)
+
+    def _new_trace(self) -> TracesSchema:
+        """Builds an empty trace for the current `run_id`."""
+        return TracesSchema(
+            run_id=self.run_id,
+            graph_name=self.graph_name,
+            graph_description=self.graph_description,
+            nodes_trace=[v.node.node_trace for v in self.nodes_pool.values()],
+            edges_trace=[]
+        )
+
+    def _start_run(self, invoke_state: Dict) -> None:
+        """Validates the input and resets all per-run state, so every call to
+        `run()`/`arun()` is a separate run with its own id, trace and counters."""
+        unknown_keys = [key for key in invoke_state if key not in self.state_def.__annotations__]
+        if unknown_keys:
+            raise KeyError(f"The following keys are not defined in the graph state: {unknown_keys}")
+
+        self.run_id = str(uuid.uuid4())
+        self.run_number = 0
+        self._edge_passes = {}
+        self._pending_branch_results = None
+        # Copy so the caller's dict isn't modified in place.
+        self.graph_state = dict(invoke_state)
+        if self.traced:
+            self.trace = self._new_trace()
+            self.trace.start_time = time.time()
+
+    def _end_run(self, error: Optional[BaseException]) -> None:
+        """Records the final status, error and elapsed time of a traced run."""
+        if error is None:
+            self.trace.status = "FINISHED"
+        else:
+            self.trace.status = "FAILED"
+            self.trace.error = _format_error(error)
+        self.trace.elapsed_time = time.time() - self.trace.start_time
+        if self.auto_save_trace:
+            self.save_run_trace()
+
+    def _count_pass(self, edge) -> int:
+        """Counts one traversal of `edge` in this run and returns the new count.
+
+        Raises:
+            RuntimeError: If the edge exceeds its `max_passes`.
+        """
+        passes = self._edge_passes.get(edge.id, 0) + 1
+        if passes > edge.max_passes:
+            raise RuntimeError(
+                f"Edge '{edge.id}' has been passed {edge.max_passes} times, "
+                "exceeding the allowed maximum without reaching a stop condition."
+            )
+        self._edge_passes[edge.id] = passes
+        return passes
+
+    def _new_edge_trace(self, edge, passes: int, input_state: Dict):
+        """Creates this traversal's own trace record for `edge`.
+
+        Deep-copied from the edge's template so per-traversal lists
+        (`function_traces`, `llm_traces`) are never shared between traversals.
+        """
+        self.run_number += 1
+        edge_trace = edge.edge_trace.model_copy(deep=True)
+        edge_trace.edge_run_number = self.run_number
+        edge_trace.passes_left = edge.max_passes - passes
+        edge_trace.state_snapshot = _snapshot(input_state)
+        return edge_trace
 
     @staticmethod
     def _compute_has_async_components(nodes_pool: Dict[str, NodePoolItem]) -> bool:
@@ -96,8 +185,9 @@ class GraphRunner:
         if not os.path.exists(self.traces_dir):
             os.makedirs(self.traces_dir)
         filename = os.path.join(self.traces_dir, f"trace_{self.run_id}.json")
-        with open(filename, 'w') as f:
-            json.dump(self.trace.model_dump(), f, indent=4)
+        with open(filename, 'w', encoding='utf-8') as f:
+            # default=str: state can hold values JSON can't encode (datetime, custom objects).
+            json.dump(self.trace.model_dump(), f, indent=4, default=str)
 
     def visualize_trace(self):
         """Generates an HTML visualization of the execution trace."""
@@ -139,34 +229,23 @@ class GraphRunner:
             )
         self._running = True
         try:
-            # Check that all keys in invoke_state exist in graph_state
-            missing_keys = [key for key in invoke_state if key not in self.state_def.__annotations__]
+            self._start_run(invoke_state)
+            start_edge = self.nodes_pool['START'].edge
 
-            if missing_keys:
-                raise KeyError(f"The following items are missing in self.graph_state: {missing_keys}")
+            if not self.traced:
+                self.traverse_graph(start_edge, self.graph_state.copy())
+                return self.graph_state
 
-            # Merge invoke_state into a copy of graph_state (avoid mutating original)
-            self.graph_state = invoke_state
-            input_state = self.graph_state.copy()
-
-            # Start traversal from the START node
-            start_pool = self.nodes_pool['START']
-            start_edges = start_pool.edge
-
-            if self.traced:
-                self.trace.start_time = time.time()
-                token = trace_var.set(self.trace)
-                try:
-                    self.traverse_graph(start_edges, input_state)
-                finally:
-                    trace_var.reset(token)
-
-                self.trace.elapsed_time = time.time() - self.trace.start_time
-                self.trace.status = "FINISHED"
-                if self.auto_save_trace:
-                    self.save_run_trace()
-            else:
-                self.traverse_graph(start_edges, input_state)
+            token = trace_var.set(self.trace)
+            error = None
+            try:
+                self.traverse_graph(start_edge, self.graph_state.copy())
+            except BaseException as e:
+                error = e
+                raise
+            finally:
+                trace_var.reset(token)
+                self._end_run(error)
 
             return self.graph_state
         finally:
@@ -200,31 +279,23 @@ class GraphRunner:
             )
         self._running = True
         try:
-            missing_keys = [key for key in invoke_state if key not in self.state_def.__annotations__]
+            self._start_run(invoke_state)
+            start_edge = self.nodes_pool['START'].edge
 
-            if missing_keys:
-                raise KeyError(f"The following items are missing in self.graph_state: {missing_keys}")
+            if not self.traced:
+                await self.atraverse_graph(start_edge, self.graph_state.copy())
+                return self.graph_state
 
-            self.graph_state = invoke_state
-            input_state = self.graph_state.copy()
-
-            start_pool = self.nodes_pool['START']
-            start_edges = start_pool.edge
-
-            if self.traced:
-                self.trace.start_time = time.time()
-                token = trace_var.set(self.trace)
-                try:
-                    await self.atraverse_graph(start_edges, input_state)
-                finally:
-                    trace_var.reset(token)
-
-                self.trace.elapsed_time = time.time() - self.trace.start_time
-                self.trace.status = "FINISHED"
-                if self.auto_save_trace:
-                    self.save_run_trace()
-            else:
-                await self.atraverse_graph(start_edges, input_state)
+            token = trace_var.set(self.trace)
+            error = None
+            try:
+                await self.atraverse_graph(start_edge, self.graph_state.copy())
+            except BaseException as e:
+                error = e
+                raise
+            finally:
+                trace_var.reset(token)
+                self._end_run(error)
 
             return self.graph_state
         finally:
@@ -255,8 +326,8 @@ class GraphRunner:
         if isinstance(node, AggregationNode):
             branch_results = self._pending_branch_results
             self._pending_branch_results = None
-            return node.execute(input_state, branch_results)
-        return node.execute(input_state)
+            return _check_node_result(node, node.execute(input_state, branch_results))
+        return _check_node_result(node, node.execute(input_state))
 
     def _run_parallel_branches(self, current_edge) -> Dict[str, Dict]:
         """Runs each parallel branch against its own isolated copy of the state.
@@ -298,8 +369,8 @@ class GraphRunner:
         if isinstance(node, AggregationNode):
             branch_results = self._pending_branch_results
             self._pending_branch_results = None
-            return await node.aexecute(input_state, branch_results)
-        return await node.aexecute(input_state)
+            return _check_node_result(node, await node.aexecute(input_state, branch_results))
+        return _check_node_result(node, await node.aexecute(input_state))
 
     async def _arun_parallel_branches(self, current_edge) -> Dict[str, Dict]:
         """Async counterpart to `_run_parallel_branches`.
@@ -347,23 +418,14 @@ class GraphRunner:
 
             edge_token = edge_id_var.set(current_edge.id) if self.traced else None
             try:
-                current_edge.passes += 1
-                if current_edge.passes > current_edge.max_passes:
-                    raise RuntimeError(
-                        f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
-                        "exceeding the allowed maximum without reaching a stop condition."
-                    )
+                passes = self._count_pass(current_edge)
 
                 edge_trace = None
                 edge_trace_token = None
                 start = None
                 if self.traced:
-                    self.run_number += 1
-                    edge_trace = current_edge.edge_trace.model_copy()
-                    edge_trace.edge_run_number = self.run_number
-                    edge_trace.passes_left = current_edge.max_passes - current_edge.passes
+                    edge_trace = self._new_edge_trace(current_edge, passes, input_state)
                     start = time.time()
-                    edge_trace.state_snapshot = input_state.copy()
                     edge_trace_token = edge_trace_var.set(edge_trace)
 
                 try:
@@ -412,13 +474,16 @@ class GraphRunner:
                         # the control flow should move to the aggregation node.
                         next_node = current_edge.aggregation_node.node
                         next_edge = current_edge.aggregation_node.edge
+                except BaseException as e:
+                    if self.traced:
+                        edge_trace.error = _format_error(e)
+                    raise
                 finally:
                     if self.traced:
                         edge_trace_var.reset(edge_trace_token)
-
-                if self.traced:
-                    edge_trace.elapsed = time.time() - start
-                    self.trace.edges_trace.append(edge_trace)
+                        # Recorded even on failure, so the failing edge shows in the trace.
+                        edge_trace.elapsed = time.time() - start
+                        self.trace.edges_trace.append(edge_trace)
             finally:
                 if self.traced:
                     edge_id_var.reset(edge_token)
@@ -451,12 +516,7 @@ class GraphRunner:
             if stop_node_name and current_node.name == stop_node_name:
                 return
 
-            current_edge.passes += 1
-            if current_edge.passes > current_edge.max_passes:
-                raise RuntimeError(
-                    f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
-                    "exceeding the allowed maximum without reaching a stop condition."
-                )
+            self._count_pass(current_edge)
 
             if current_edge.edge_type == "__forward__":
                 if not isinstance(current_node, _StartNode):
@@ -525,20 +585,9 @@ class GraphRunner:
 
             edge_token = edge_id_var.set(current_edge.id)
             try:
-                current_edge.passes += 1
-                if current_edge.passes > current_edge.max_passes:
-                    raise RuntimeError(
-                        f"Edge '{current_edge.id}' has been passed {current_edge.max_passes} times, "
-                        "exceeding the allowed maximum without reaching a stop condition."
-                    )
-                self.run_number += 1
-
-                edge_trace = current_edge.edge_trace.model_copy()
-                edge_trace.edge_run_number = self.run_number
-                edge_trace.passes_left = current_edge.max_passes - current_edge.passes
+                passes = self._count_pass(current_edge)
+                edge_trace = self._new_edge_trace(current_edge, passes, input_state)
                 start = time.time()
-                edge_trace.state_snapshot = input_state.copy()
-
                 edge_trace_token = edge_trace_var.set(edge_trace)
                 try:
                     if current_edge.edge_type == "__forward__":
@@ -581,11 +630,14 @@ class GraphRunner:
                         # the control flow should move to the aggregation node.
                         next_node = current_edge.aggregation_node.node
                         next_edge = current_edge.aggregation_node.edge
+                except BaseException as e:
+                    edge_trace.error = _format_error(e)
+                    raise
                 finally:
                     edge_trace_var.reset(edge_trace_token)
-
-                edge_trace.elapsed = time.time() - start
-                self.trace.edges_trace.append(edge_trace)
+                    # Recorded even on failure, so the failing edge shows in the trace.
+                    edge_trace.elapsed = time.time() - start
+                    self.trace.edges_trace.append(edge_trace)
             finally:
                 edge_id_var.reset(edge_token)
 

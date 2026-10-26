@@ -63,11 +63,6 @@ if __name__ == "__main__":
     orkes_memory_results.append({"iteration": 0, "state_size": initial_data_size, "memory_mb": mem_before_run, "execution_time_ms": 0})
 
     for i in range(num_iterations):
-        # Reset edge passes for all relevant edges before each run
-        for node_name, node_item in orkes_compiled_graph.nodes_pool.items():
-            if node_item.edge and hasattr(node_item.edge, 'passes'):
-                node_item.edge.passes = 0
-        
         start_time = time.perf_counter()
         current_orkes_state = orkes_compiled_graph.run(current_orkes_state)
         end_time = time.perf_counter()

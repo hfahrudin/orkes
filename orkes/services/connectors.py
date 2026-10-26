@@ -1,6 +1,7 @@
 from typing import Optional, Dict, AsyncGenerator, Any, Callable
 import requests
 import aiohttp
+from pydantic import BaseModel
 from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
 from orkes.services.schema import LLMInterface, OrkesToolSchema
 from orkes.shared.schema import OrkesMessagesSchema
@@ -142,7 +143,12 @@ class UniversalLLMClient(LLMInterface):
         if edge_trace:
             llm_trace = LLMTraceSchema(
                 messages=messages,
-                tools=tools,
+                # Record the tool schemas sent, not the raw callables (which
+                # aren't valid trace data and made this call fail).
+                tools=[
+                    t.model_dump(exclude={"function"}) if isinstance(t, BaseModel) else t
+                    for t in processed_tools
+                ] or None,
                 parsed_response=parsed_response,
                 model=self.config.model,
                 settings=settings

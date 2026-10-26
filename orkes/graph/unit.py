@@ -186,7 +186,6 @@ class Edge(ABC):
         id (str): A unique identifier for the edge instance.
         from_node (NodePoolItem): The node from which the edge originates.
         to_node (NodePoolItem): The node to which the edge points.
-        passes (int): The number of times the edge has been traversed.
         max_passes (int): The maximum number of times the edge can be traversed.
         edge_type (str): The type of the edge.
         edge_trace (EdgeTrace): The trace object for the edge.
@@ -207,7 +206,6 @@ class Edge(ABC):
         self.id = "edge_" + str(uuid.uuid4())
         self.from_node = from_node
         self.to_node = to_node
-        self.passes = 0
         self.max_passes = max_passes
         self.edge_type = None
         self.edge_trace = EdgeTrace(

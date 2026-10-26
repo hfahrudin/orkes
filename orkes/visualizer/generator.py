@@ -1,5 +1,7 @@
+import html
 import json
 import itertools
+import re
 from typing import Union, Dict, List, Optional
 from pathlib import Path
 from orkes.shared.utils import format_elapsed_time, format_start_time
@@ -9,6 +11,17 @@ DEFAULT_FUNCTION_NODE_COLORS = [
     "#E3FAFC", "#D0EBFF", "#C5F6FA", "#E5DBFF", "#D0BFFF",
     "#EDF2FF", "#E9ECEF", "#F1F3F5", "#DEE2E6", "#F3F0FF",
 ]
+
+def _json_for_script(data) -> str:
+    """Serializes data for embedding inside an HTML <script> block.
+
+    `<`, `>` and `&` are escaped as JSON unicode escapes so trace values (e.g.
+    a state string containing "</script>") can't close the script block.
+    `default=str` covers values JSON can't encode, such as datetimes.
+    """
+    text = json.dumps(data, indent=2, default=str)
+    return text.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
 
 class TraceInspector:
     """A class to generate Vis.js compatible HTML visualizations from trace data.
@@ -72,7 +85,7 @@ class TraceInspector:
             <div class="title-header">
                 <div class="title-main">
                     <span style="color:{status_color};">&#9679;</span>
-                    {main_title}
+                    {html.escape(str(main_title))}
                 </div>
                 <button class="min-btn-title" onclick="toggleTitleCard()" title="Minimize/Maximize">&minus;</button>
             </div>
@@ -83,7 +96,7 @@ class TraceInspector:
                 continue
             
             label = key.replace("_", " ").title().replace("Id", "ID")
-            val_str = str(value)
+            val_str = html.escape(str(value))
             
             row = f'<div class="prop-row"><span class="key">{label}:</span><div class="title-sub">{val_str}</div></div>'
             body_rows.append(row)
@@ -221,17 +234,19 @@ class TraceInspector:
             "Status": status.upper(),
             "Start Time": start_time,
             "Elapsed": elapsed,
-            "Description": graph_description
+            "Description": graph_description,
+            **({"Error": data["error"]} if data.get("error") else {}),
         })
-        
-        final_html = self.html_template.replace(
-            "JSON_NODES", json.dumps(nodes, indent=2)
-        ).replace(
-            "JSON_EDGES", json.dumps(edges, indent=2)
-        ).replace(
-            "TITLE_CARD_CONTENT", title_card_content)
-        
-        return final_html
+
+        # One pass, so a placeholder name appearing inside trace data is never substituted.
+        replacements = {
+            "JSON_NODES": _json_for_script(nodes),
+            "JSON_EDGES": _json_for_script(edges),
+            "TITLE_CARD_CONTENT": title_card_content,
+        }
+        return re.sub(
+            "|".join(replacements), lambda m: replacements[m.group(0)], self.html_template
+        )
 
     def generate_viz(self, trace_data: Union[str, Dict], output_path: str = ""):
         """Generates the HTML visualization and saves it to a file.
