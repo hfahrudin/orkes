@@ -1,10 +1,10 @@
 from typing import Optional, Dict, AsyncGenerator, Any, Callable
 import requests
 import aiohttp
-from pydantic import BaseModel
+from dataclasses import is_dataclass
 from orkes.services.strategies import LLMProviderStrategy, OpenAIStyleStrategy, AnthropicStrategy, GoogleGeminiStrategy
 from orkes.services.schema import LLMInterface, OrkesToolSchema
-from orkes.shared.schema import OrkesMessagesSchema
+from orkes.shared.schema import OrkesMessagesSchema, to_dict
 from orkes.shared.context import edge_trace_var
 from orkes.graph.schema import LLMTraceSchema
 from orkes.shared.utils import callable_to_orkes_tool_schema
@@ -146,7 +146,7 @@ class UniversalLLMClient(LLMInterface):
                 # Record the tool schemas sent, not the raw callables (which
                 # aren't valid trace data and made this call fail).
                 tools=[
-                    t.model_dump(exclude={"function"}) if isinstance(t, BaseModel) else t
+                    to_dict(t, exclude=("function",)) if is_dataclass(t) else t
                     for t in processed_tools
                 ] or None,
                 parsed_response=parsed_response,
@@ -157,7 +157,7 @@ class UniversalLLMClient(LLMInterface):
 
         return {
             "raw": data,
-            "content": parsed_response.model_dump()
+            "content": to_dict(parsed_response)
         }
 
     async def stream_message(self, messages: OrkesMessagesSchema, endpoint: str = None, tools: Optional[list[OrkesToolSchema | Callable]] = None, connection: Optional[Any] = None, **kwargs) -> AsyncGenerator[str, None]:

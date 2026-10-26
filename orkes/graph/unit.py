@@ -321,4 +321,3 @@ class ParallelEdge(Edge):
                 "aggregation_node": self.aggregation_node.node.name
             })
 
-NodePoolItem.model_rebuild()

@@ -93,7 +93,7 @@ def _direct_calls():
     return s
 
 
-@pytest.mark.parametrize("traced, limit", [(False, 40), (True, 400)])
+@pytest.mark.parametrize("traced, limit", [(False, 40), (True, 200)])
 def test_runner_overhead_vs_direct_calls(traced, limit):
     """Running a 10-node chain should cost a bounded multiple of calling the
     10 functions directly. Catches extra work added per edge."""
@@ -276,7 +276,7 @@ def test_tracing_overhead_vs_untraced():
     untraced_time = _best_time(lambda: untraced.run({"n": 0, "data": {}}), number=200)
 
     ratio = traced_time / untraced_time
-    limit = 25
+    limit = 12
     _report("traced/untraced ratio", ratio, limit)
     assert ratio < limit
 
@@ -328,18 +328,34 @@ def _import_stats(module: str):
     return best_time, modules
 
 
-def test_import_weight_vs_pydantic():
-    """pydantic is orkes's one core dependency; importing the graph API should
-    cost little beyond importing pydantic itself."""
-    orkes_time, orkes_modules = _import_stats("orkes.graph")
-    pydantic_time, pydantic_modules = _import_stats("pydantic, pydantic.main")
+# The standard-library modules orkes's graph code itself imports.
+STDLIB_REFERENCE = "json, copy, dataclasses, inspect, typing, uuid, contextvars, time, os, itertools, html, re, pathlib"
 
-    time_ratio = orkes_time / pydantic_time
-    module_ratio = orkes_modules / pydantic_modules
-    _report("import time ratio (orkes.graph / pydantic)", time_ratio, 3)
-    _report("modules loaded ratio (orkes.graph / pydantic)", module_ratio, 3)
-    assert time_ratio < 3
-    assert module_ratio < 3
+
+def test_import_weight_vs_stdlib():
+    """The graph API needs only the standard library, so importing it should
+    cost about as much as importing the stdlib modules it uses."""
+    orkes_time, orkes_modules = _import_stats("orkes.graph")
+    stdlib_time, stdlib_modules = _import_stats(STDLIB_REFERENCE)
+
+    time_ratio = orkes_time / stdlib_time
+    module_ratio = orkes_modules / stdlib_modules
+    _report("import time ratio (orkes.graph / stdlib it uses)", time_ratio, 2)
+    _report("modules loaded ratio (orkes.graph / stdlib it uses)", module_ratio, 2)
+    assert time_ratio < 2
+    assert module_ratio < 2
+
+
+def test_graph_import_loads_no_third_party_packages():
+    """Using graphs must not pull in pydantic or the LLM HTTP libraries."""
+    code = (
+        "import sys\n"
+        "import orkes.graph\n"
+        "print(' '.join(sorted({m.split('.')[0] for m in sys.modules})))\n"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    loaded = set(out.stdout.split())
+    assert not loaded & {"pydantic", "pydantic_core", "aiohttp", "requests"}
 
 
 # --- Comparison with LangGraph ---------------------------------------------------

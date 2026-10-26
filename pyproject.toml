@@ -14,7 +14,6 @@ authors = [
   { name = "Hasby Fahrudin", email = "fahrudinhasby12@gmail.com" }
 ]
 dependencies = [
-  "pydantic>=2.0",
   "aiohttp",
   "requests"
 ]
@@ -37,7 +36,6 @@ docs = [
     "sphinx",
     "sphinxcontrib-mermaid",
     "sphinx-copybutton",
-    "autodoc_pydantic",
     "pydata-sphinx-theme"
 ]
 

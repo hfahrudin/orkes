@@ -1,11 +1,12 @@
-from pydantic import BaseModel
+from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING, Union, List, Dict, Any
 from orkes.shared.schema import OrkesMessagesSchema, RequestSchema
 
 if TYPE_CHECKING:
     from orkes.graph.unit import Node, Edge
 
-class NodePoolItem(BaseModel):
+@dataclass(kw_only=True, eq=False)
+class NodePoolItem:
     """
     Represents an item in the node pool, which is a collection of nodes and their
     associated edges within the graph. Each item encapsulates a node and an optional
@@ -21,11 +22,8 @@ class NodePoolItem(BaseModel):
     node: "Node"
     edge: Optional[Union["Edge", str]] = None
 
-    model_config = {
-        "arbitrary_types_allowed": True
-    }
-
-class NodeTrace(BaseModel):
+@dataclass(kw_only=True)
+class NodeTrace:
     """
     Represents the trace of a single node's execution within the graph. It captures
     key information about the node for logging, debugging, and visualization purposes.
@@ -43,7 +41,8 @@ class NodeTrace(BaseModel):
     node_description: Optional[str] = None
     meta: dict
 
-class LLMTraceSchema(BaseModel):
+@dataclass(kw_only=True)
+class LLMTraceSchema:
     """
     Represents the input and output of an LLM interaction for tracking purposes.
 
@@ -62,7 +61,8 @@ class LLMTraceSchema(BaseModel):
     settings: Optional[Dict] = None
 
 
-class FunctionTraceSchema(BaseModel):
+@dataclass(kw_only=True)
+class FunctionTraceSchema:
     """
     Represents the trace of a single function's execution, capturing its inputs,
     output, and timing.
@@ -80,7 +80,8 @@ class FunctionTraceSchema(BaseModel):
     return_value: Any
     elapsed: float
 
-class EdgeTrace(BaseModel):
+@dataclass(kw_only=True)
+class EdgeTrace:
     """
     Represents the trace of a single edge traversal during a graph execution.
 
@@ -117,14 +118,15 @@ class EdgeTrace(BaseModel):
     passes_left: int
     edge_type: Union[str, None]
     elapsed: float
-    state_snapshot: dict = {}
+    state_snapshot: dict = field(default_factory=dict)
     meta: dict
-    function_traces: List[FunctionTraceSchema] = []
-    llm_traces: List[LLMTraceSchema] = []
+    function_traces: List[FunctionTraceSchema] = field(default_factory=list)
+    llm_traces: List[LLMTraceSchema] = field(default_factory=list)
     error: Optional[str] = None
 
 
-class TracesSchema(BaseModel):
+@dataclass(kw_only=True)
+class TracesSchema:
     """
     Represents the complete execution trace of a graph run.
 
@@ -145,7 +147,7 @@ class TracesSchema(BaseModel):
         error (str | None): The exception that failed the run, as
             "ExceptionType: message", or None if it finished.
     """
-    graph_name : str
+    graph_name: str
     graph_description: str
     run_id: str
     start_time: float = 0.0

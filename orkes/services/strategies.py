@@ -1,7 +1,7 @@
 from typing import Optional, Dict,List
 import json
 from orkes.services.schema import LLMProviderStrategy
-from orkes.shared.schema import RequestSchema, ToolCallSchema
+from orkes.shared.schema import RequestSchema, ToolCallSchema, to_dict
 from typing import Union
 from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
 
@@ -33,7 +33,7 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
         Returns:
             Dict[str, List[Dict]]: The messages in the provider's format.
         """
-        processed_messages = [msg.model_dump() for msg in messages.messages]
+        processed_messages = [to_dict(msg) for msg in messages.messages]
         return {"messages": processed_messages}
 
     def get_tools_payload(self, tools: List[OrkesToolSchema]) -> List[Dict]:
@@ -48,7 +48,7 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
         """
         tool_payloads = [{
                 "type": "function",
-                "function": tool.model_dump()
+                "function": to_dict(tool, exclude=("function",))
             } for tool in tools]
         return tool_payloads
 
@@ -153,7 +153,7 @@ class AnthropicStrategy(LLMProviderStrategy):
         Returns:
             Dict[str, Union[str, List[Dict]]]: The messages in the provider's format.
         """
-        processed_messages = [msg.model_dump() for msg in messages.messages]
+        processed_messages = [to_dict(msg) for msg in messages.messages]
 
         system_msg = next((msg['content'] for msg in processed_messages if msg['role'] == 'system'), None)
         chat_messages = [msg for msg in processed_messages if msg['role'] != 'system']
@@ -177,7 +177,7 @@ class AnthropicStrategy(LLMProviderStrategy):
         tool_payloads = [{
                 "name": tool.name,
                 "description": tool.description,
-                "input_schema": tool.parameters.model_dump()
+                "input_schema": to_dict(tool.parameters)
             }
             for tool in tools]
         return tool_payloads
@@ -293,7 +293,7 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
         Returns:
             Dict[str, List[Dict]]: The messages in the provider's format.
         """
-        processed_messages = [msg.model_dump() for msg in messages.messages]
+        processed_messages = [to_dict(msg) for msg in messages.messages]
 
         gemini_contents = []
         for msg in processed_messages:
@@ -316,7 +316,7 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
         """
         tools_payloads = []
         for tool in tools:
-            dump = tool.model_dump()
+            dump = to_dict(tool, exclude=("function",))
             tool_dict = {
                 "name": dump["name"],
                 "description": dump["description"],

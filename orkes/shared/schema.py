@@ -1,8 +1,31 @@
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, Dict, List, Optional, Callable, Union
-from pydantic import BaseModel
 
 
-class ToolCallSchema(BaseModel):
+def to_dict(obj: Any, exclude: tuple = ()) -> Any:
+    """Converts a schema object (and any nested ones) into plain dicts and lists.
+
+    Unlike `dataclasses.asdict`, values are not deep-copied, so state holding
+    objects that can't be copied (locks, clients) still converts.
+
+    Args:
+        obj: A schema dataclass, or a list/tuple/dict that may contain them.
+        exclude (tuple): Field names to leave out of the top-level object.
+
+    Returns:
+        The same data built from dicts and lists.
+    """
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return {f.name: to_dict(getattr(obj, f.name)) for f in fields(obj) if f.name not in exclude}
+    if isinstance(obj, (list, tuple)):
+        return [to_dict(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: to_dict(v) for k, v in obj.items()}
+    return obj
+
+
+@dataclass(kw_only=True)
+class ToolCallSchema:
     """Represents a tool call requested by the LLM.
 
     This schema defines the structure of a tool call, which includes the name of the
@@ -15,7 +38,9 @@ class ToolCallSchema(BaseModel):
     function_name: str
     arguments: Dict[str, Any]
 
-class RequestSchema(BaseModel):
+
+@dataclass(kw_only=True)
+class RequestSchema:
     """Represents a standard response from an LLM.
 
     This schema defines the structure of a response from an LLM, which can be either
@@ -27,10 +52,11 @@ class RequestSchema(BaseModel):
         content (Union[str, List[ToolCallSchema]]): The content of the response.
     """
     content_type: str
-    content : Union[str, List[ToolCallSchema]]
+    content: Union[str, List[ToolCallSchema]]
 
 
-class ToolParameter(BaseModel):
+@dataclass(kw_only=True)
+class ToolParameter:
     """Represents the JSON Schema for the parameters of a tool.
 
     This class defines the structure of the parameters that a tool can accept,
@@ -48,7 +74,9 @@ class ToolParameter(BaseModel):
     properties: Dict[str, Any]
     required: Optional[List[str]] = None
 
-class OrkesToolSchema(BaseModel):
+
+@dataclass(kw_only=True)
+class OrkesToolSchema:
     """A universal schema for defining a tool that can be used by an LLM.
 
     This schema is used to define a tool that can be used by an LLM. It contains
@@ -59,7 +87,7 @@ class OrkesToolSchema(BaseModel):
         name (str): The name of the tool.
         description (str): A description of what the tool does.
         parameters (ToolParameter): The schema for the parameters that the tool
-                                   accepts.
+                                   accepts. A plain dict is converted.
         function (Callable, optional): The actual callable function for the tool.
                                        Defaults to None.
     """
@@ -68,11 +96,13 @@ class OrkesToolSchema(BaseModel):
     parameters: ToolParameter
     function: Optional[Callable] = None
 
-    model_config = {
-        "arbitrary_types_allowed": True
-    }
+    def __post_init__(self):
+        if isinstance(self.parameters, dict):
+            self.parameters = ToolParameter(**self.parameters)
 
-class OrkesMessageSchema(BaseModel):
+
+@dataclass(kw_only=True)
+class OrkesMessageSchema:
     """Represents a single message in a conversation with an LLM.
 
     This schema is used to represent a single message in a conversation with an
@@ -94,14 +124,26 @@ class OrkesMessageSchema(BaseModel):
     content_type: Optional[str] = None
     tool_call_id: Optional[str] = None
 
+    def __post_init__(self):
+        if not isinstance(self.role, str):
+            raise TypeError(f"Message 'role' must be a str, got {type(self.role).__name__}.")
 
-class OrkesMessagesSchema(BaseModel):
+
+@dataclass(kw_only=True)
+class OrkesMessagesSchema:
     """Represents a list of messages to be sent to an LLM as part of a request.
 
     This is a container for a list of `OrkesMessageSchema` objects, representing
     a complete conversation or a turn in a conversation.
 
     Attributes:
-        messages (List[OrkesMessageSchema]): A list of messages.
+        messages (List[OrkesMessageSchema]): A list of messages. Plain dicts
+            (e.g. ``{"role": "user", "content": "hi"}``) are converted.
     """
     messages: List[OrkesMessageSchema]
+
+    def __post_init__(self):
+        self.messages = [
+            OrkesMessageSchema(**m) if isinstance(m, dict) else m
+            for m in self.messages
+        ]

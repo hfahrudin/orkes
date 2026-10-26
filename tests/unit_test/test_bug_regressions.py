@@ -10,6 +10,7 @@ import pytest
 
 from orkes.graph.core import OrkesGraph
 from orkes.graph.utils import orkes_tracable, function_assertion
+from orkes.shared.schema import to_dict
 
 
 class S(TypedDict):
@@ -319,7 +320,7 @@ def test_inspector_escapes_trace_data():
     runner = _linear_graph(node, state=T, name="<b>graph</b>").compile()
     runner.run({"text": payload})
 
-    page = TraceInspector().generate_html(runner.trace.model_dump())
+    page = TraceInspector().generate_html(to_dict(runner.trace))
 
     assert payload not in page
     assert "\\u003c/script\\u003e" in page
@@ -339,5 +340,5 @@ def test_inspector_placeholder_text_in_data_is_not_substituted():
     runner = _linear_graph(node, state=T).compile()
     runner.run({"text": "JSON_EDGES TITLE_CARD_CONTENT"})
 
-    page = TraceInspector().generate_html(runner.trace.model_dump())
+    page = TraceInspector().generate_html(to_dict(runner.trace))
     assert "JSON_EDGES TITLE_CARD_CONTENT" in page

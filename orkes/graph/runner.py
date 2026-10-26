@@ -1,6 +1,7 @@
 
 
 import copy
+import dataclasses
 import json
 import time
 import uuid
@@ -9,6 +10,7 @@ from collections.abc import Mapping
 from typing import Dict, Union, Optional
 from orkes.graph.unit import ForwardEdge, ConditionalEdge
 from orkes.graph.schema import NodePoolItem, TracesSchema
+from orkes.shared.schema import to_dict
 from orkes.graph.unit import _EndNode, _StartNode, AggregationNode
 from orkes.visualizer.generator import TraceInspector
 from orkes.shared.context import trace_var, edge_id_var, edge_trace_var
@@ -151,11 +153,20 @@ class GraphRunner:
     def _new_edge_trace(self, edge, passes: int, input_state: Dict):
         """Creates this traversal's own trace record for `edge`.
 
-        Deep-copied from the edge's template so per-traversal lists
-        (`function_traces`, `llm_traces`) are never shared between traversals.
+        Copied from the edge's template with fresh lists and dicts, so
+        per-traversal data (`function_traces`, `llm_traces`, `meta`) is never
+        shared between traversals.
         """
         self.run_number += 1
-        edge_trace = edge.edge_trace.model_copy(deep=True)
+        template = edge.edge_trace
+        edge_trace = dataclasses.replace(
+            template,
+            to_node=list(template.to_node) if isinstance(template.to_node, list) else template.to_node,
+            meta=dict(template.meta),
+            state_snapshot={},
+            function_traces=[],
+            llm_traces=[],
+        )
         edge_trace.edge_run_number = self.run_number
         edge_trace.passes_left = edge.max_passes - passes
         edge_trace.state_snapshot = _snapshot(input_state)
@@ -187,7 +198,7 @@ class GraphRunner:
         filename = os.path.join(self.traces_dir, f"trace_{self.run_id}.json")
         with open(filename, 'w', encoding='utf-8') as f:
             # default=str: state can hold values JSON can't encode (datetime, custom objects).
-            json.dump(self.trace.model_dump(), f, indent=4, default=str)
+            json.dump(to_dict(self.trace), f, indent=4, default=str)
 
     def visualize_trace(self):
         """Generates an HTML visualization of the execution trace."""
@@ -197,7 +208,7 @@ class GraphRunner:
             os.makedirs(self.traces_dir)
         base_name = f"trace_{self.run_id}_inspector.html"
         out_file = os.path.join(self.traces_dir, base_name)
-        self.trace_inspector.generate_viz(self.trace.model_dump(), out_file)
+        self.trace_inspector.generate_viz(to_dict(self.trace), out_file)
 
     def run(self, invoke_state: Dict) -> Dict:
         """Runs the graph with a given initial state.

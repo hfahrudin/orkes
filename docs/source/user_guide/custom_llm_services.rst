@@ -24,7 +24,7 @@ First, create a Python class for your connector. It's a good practice to have it
         def invoke(self, messages: list[OrkesMessageSchema]) -> OrkesMessageSchema:
             # This is the main method that Orkes will call.
             # It takes a list of messages and should return a single message.
-            # Note: OrkesMessageSchema is a pydantic model, so use attribute
+            # Note: OrkesMessageSchema is a dataclass, so use attribute
             # access (msg.role / msg.content), not dict-style subscripting.
 
             # In a real connector, you would make an API call here.
