@@ -32,8 +32,8 @@ Roadmap
    * - Parallel Graph Execution
      - Enhance the graph runner to support parallel execution of independent branches for improved performance.
      - Implemented
-   * - Tracer Web Platform
-     - Develop a standalone web-based platform for visualizing and inspecting graph traces in real-time.
+   * - Orkes Watcher Export
+     - Stream graph traces to Orkes Watcher, a separate web platform for inspecting runs live and across history.
      - Progressing
 
 
