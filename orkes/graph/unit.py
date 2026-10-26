@@ -135,7 +135,8 @@ class AggregationNode(Node):
     needed) -- only the parameter's presence is required, not its use. The
     state passed as the first argument is always the snapshot from the
     moment the branches forked; nothing a branch wrote is merged in
-    automatically.
+    automatically. If the node is reached without going through its fork
+    (e.g. a loop back into it), `branch_results` is an empty dict.
     """
     def __init__(self, name: str, func: Callable, graph_state):
         super().__init__(name, func, graph_state)

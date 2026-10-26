@@ -342,3 +342,141 @@ def test_inspector_placeholder_text_in_data_is_not_substituted():
 
     page = TraceInspector().generate_html(to_dict(runner.trace))
     assert "JSON_EDGES TITLE_CARD_CONTENT" in page
+
+
+# --- LLM provider payloads ----------------------------------------------------
+
+def _tool_round_trip_messages():
+    """A user question, the assistant's tool calls, and both tool results."""
+    from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema
+
+    calls = [
+        {"function_name": "get_weather", "arguments": {"city": "SF"}, "id": "call_1"},
+        {"function_name": "get_time", "arguments": {}, "id": "call_2"},
+    ]
+    return OrkesMessagesSchema(messages=[
+        OrkesMessageSchema(role="system", content="be brief"),
+        OrkesMessageSchema(role="user", content="weather and time?"),
+        OrkesMessageSchema(role="assistant", content=calls, content_type="tool_calls"),
+        OrkesMessageSchema(role="tool", content="sunny", tool_call_id="call_1"),
+        OrkesMessageSchema(role="tool", content="noon", tool_call_id="call_2"),
+    ])
+
+
+def test_messages_payload_has_no_null_extra_fields():
+    """Every message used to carry content_type/tool_call_id = null, which
+    Anthropic's API rejects as unknown fields."""
+    from orkes.shared.schema import OrkesMessagesSchema
+    from orkes.services.strategies import OpenAIStyleStrategy, AnthropicStrategy
+
+    messages = OrkesMessagesSchema(messages=[{"role": "user", "content": "hi"}])
+    assert OpenAIStyleStrategy().get_messages_payload(messages)["messages"] == [{"role": "user", "content": "hi"}]
+    assert AnthropicStrategy().get_messages_payload(messages)["messages"] == [{"role": "user", "content": "hi"}]
+
+
+@pytest.mark.parametrize("strategy_name, response, expected_id", [
+    ("OpenAIStyleStrategy",
+     {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": [
+         {"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"SF\"}"}}]}}]},
+     "call_1"),
+    ("AnthropicStrategy",
+     {"content": [{"type": "tool_use", "id": "toolu_1", "name": "get_weather", "input": {"city": "SF"}}]},
+     "toolu_1"),
+    ("GoogleGeminiStrategy",
+     {"candidates": [{"content": {"parts": [{"functionCall": {"id": "fc_1", "name": "get_weather", "args": {"city": "SF"}}}]}}]},
+     "fc_1"),
+])
+def test_tool_call_id_is_kept(strategy_name, response, expected_id):
+    """The provider's tool call id used to be dropped, so tool results couldn't be sent back."""
+    from orkes.services import strategies
+
+    parsed = getattr(strategies, strategy_name)().parse_response(response)
+    assert parsed.content_type == "tool_calls"
+    assert parsed.content[0].id == expected_id
+    assert parsed.content[0].arguments == {"city": "SF"}
+
+
+def test_openai_tool_round_trip_payload():
+    from orkes.services.strategies import OpenAIStyleStrategy
+
+    messages = OpenAIStyleStrategy().get_messages_payload(_tool_round_trip_messages())["messages"]
+    assert messages[0] == {"role": "system", "content": "be brief"}
+    assert messages[2] == {"role": "assistant", "content": None, "tool_calls": [
+        {"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"SF\"}"}},
+        {"id": "call_2", "type": "function", "function": {"name": "get_time", "arguments": "{}"}},
+    ]}
+    assert messages[3] == {"role": "tool", "content": "sunny", "tool_call_id": "call_1"}
+    assert messages[4] == {"role": "tool", "content": "noon", "tool_call_id": "call_2"}
+
+
+def test_anthropic_tool_round_trip_payload():
+    from orkes.services.strategies import AnthropicStrategy
+
+    payload = AnthropicStrategy().get_messages_payload(_tool_round_trip_messages())
+    assert payload["system"] == "be brief"
+    assert payload["messages"] == [
+        {"role": "user", "content": "weather and time?"},
+        {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "call_1", "name": "get_weather", "input": {"city": "SF"}},
+            {"type": "tool_use", "id": "call_2", "name": "get_time", "input": {}},
+        ]},
+        # both results of the parallel calls go in one user message
+        {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "call_1", "content": "sunny"},
+            {"type": "tool_result", "tool_use_id": "call_2", "content": "noon"},
+        ]},
+    ]
+
+
+def test_parsed_tool_calls_can_be_sent_back():
+    """The documented loop: parse a reply, append it plus the results, send again."""
+    from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema, to_dict
+    from orkes.services.strategies import OpenAIStyleStrategy
+
+    strategy = OpenAIStyleStrategy()
+    reply = to_dict(strategy.parse_response({"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": [
+        {"id": "call_9", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"SF\"}"}}]}}]}))
+
+    messages = OrkesMessagesSchema(messages=[{"role": "user", "content": "weather?"}])
+    messages.messages.append(OrkesMessageSchema(role="assistant", content=reply["content"], content_type="tool_calls"))
+    messages.messages.append(OrkesMessageSchema(role="tool", content="sunny", tool_call_id=reply["content"][0]["id"]))
+
+    sent = strategy.get_messages_payload(messages)["messages"]
+    assert sent[1]["tool_calls"][0]["id"] == sent[2]["tool_call_id"] == "call_9"
+
+
+# --- Aggregation node reached without its fork --------------------------------
+
+def test_aggregation_node_reentered_gets_empty_branch_results():
+    """A loop back into an aggregation node used to pass branch_results=None."""
+    seen = []
+
+    def fork(s: S):
+        return s
+
+    def branch(s: S):
+        s["n"] += 1
+        return s
+
+    def join(s: S, branch_results):
+        seen.append(sorted(branch_results))
+        s["items"] = s["items"] + [len(branch_results)]
+        return s
+
+    def gate(s: S):
+        return "again" if len(s["items"]) < 2 else "done"
+
+    g = OrkesGraph(S)
+    g.add_node("fork", fork)
+    g.add_node("a", branch)
+    g.add_node("b", branch)
+    g.add_node("join", join)
+    g.add_edge(g.START, "fork")
+    g.add_parallel_edges("fork", ["a", "b"], "join")
+    g.add_edge("a", "join")
+    g.add_edge("b", "join")
+    g.add_conditional_edge("join", gate, {"again": "join", "done": "END"})
+
+    result = g.compile().run({"n": 0, "items": []})
+    assert seen == [["a", "b"], []]  # via the fork, then the loop back
+    assert result["items"] == [2, 0]

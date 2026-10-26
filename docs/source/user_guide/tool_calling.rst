@@ -61,7 +61,7 @@ Here's an example of how to define a ``get_weather`` tool:
     # response['content'] is the dumped RequestSchema: {"content_type": ..., "content": ...}
     # content_type is "tool_calls" if the LLM decided to use a tool, or "message" for plain text.
     if response["content"]["content_type"] == "tool_calls":
-        # 'content' is then a list of dumped ToolCallSchema dicts: {"function_name": ..., "arguments": {...}}
+        # 'content' is then a list of dumped ToolCallSchema dicts: {"function_name": ..., "arguments": {...}, "id": ...}
         for tool_call in response["content"]["content"]:
             if tool_call["function_name"] == "get_weather":
                 # ... call your actual get_weather function with tool_call["arguments"] ...
@@ -79,7 +79,7 @@ Here's how you can achieve the same ``get_weather`` tool definition using a Pyth
 
 .. code-block:: python
 
-    from orkes.shared.schema import OrkesMessagesSchema
+    from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema
     # Assuming you have an `openai_client` instance configured
 
     def get_weather(location: str) -> str:
@@ -100,9 +100,23 @@ Here's how you can achieve the same ``get_weather`` tool definition using a Pyth
     response = openai_client.send_message(messages, tools=[get_weather])
 
     if response["content"]["content_type"] == "tool_calls":
-        for tool_call in response["content"]["content"]:
+        tool_calls = response["content"]["content"]  # each has "function_name", "arguments" and "id"
+
+        # 1. Add the assistant's tool calls to the conversation
+        messages.messages.append(
+            OrkesMessageSchema(role="assistant", content=tool_calls, content_type="tool_calls")
+        )
+
+        # 2. Run each tool and add its result, linked to the call by its id
+        for tool_call in tool_calls:
             if tool_call["function_name"] == "get_weather":
-                # Execute the function with arguments from the LLM's tool call
                 weather_report = get_weather(**tool_call["arguments"])
-                print(f"Weather report: {weather_report}")
-                # ... send the tool result back to the LLM ...
+                messages.messages.append(
+                    OrkesMessageSchema(role="tool", content=weather_report, tool_call_id=tool_call["id"])
+                )
+
+        # 3. Send the conversation back for the final answer
+        final = openai_client.send_message(messages, tools=[get_weather])
+        print(final["content"]["content"])
+
+This round trip works the same way with the OpenAI-style and Anthropic clients; Orkes converts the tool-call and tool-result messages into each provider's own format. Sending tool results back to Gemini is not supported yet.

@@ -34,9 +34,12 @@ class ToolCallSchema:
     Attributes:
         function_name (str): The name of the function to be called.
         arguments (Dict[str, Any]): A dictionary of arguments for the function.
+        id (Optional[str]): The provider's id for this call. Pass it back as the
+            `tool_call_id` of the tool result message.
     """
     function_name: str
     arguments: Dict[str, Any]
+    id: Optional[str] = None
 
 
 @dataclass(kw_only=True)
@@ -115,9 +118,21 @@ class OrkesMessageSchema:
         content (Union[str, List[Dict], None]): The content of the message. Can be a string,
                                      a list of dictionaries (for tool calls),
                                      or None.
-        content_type (Optional[str]): The type of content, e.g., 'tool_calls'.
+        content_type (Optional[str]): The type of content. Set it to 'tool_calls'
+            on an assistant message whose `content` is the list of tool calls the
+            LLM returned, when sending them back as conversation history.
         tool_call_id (Optional[str]): The ID of the tool call, used for messages with
                                    the 'tool' role.
+
+    Example (sending a tool result back)::
+
+        reply = client.send_message(messages, tools=[get_weather])["content"]
+        calls = reply["content"]  # list of {"function_name", "arguments", "id"}
+        messages.messages.append(OrkesMessageSchema(role="assistant", content=calls, content_type="tool_calls"))
+        for call in calls:
+            result = get_weather(**call["arguments"])
+            messages.messages.append(OrkesMessageSchema(role="tool", content=result, tool_call_id=call["id"]))
+        final = client.send_message(messages, tools=[get_weather])
     """
     role: str
     content: Union[str, List[Dict], None]

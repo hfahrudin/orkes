@@ -3,7 +3,15 @@ import json
 from orkes.services.schema import LLMProviderStrategy
 from orkes.shared.schema import RequestSchema, ToolCallSchema, to_dict
 from typing import Union
-from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema
+from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema, OrkesToolSchema
+
+
+def _tool_calls(msg: OrkesMessageSchema) -> Optional[List[Dict]]:
+    """Returns the tool calls carried by an assistant message, as dicts with
+    `function_name`, `arguments` and `id`, or None if it doesn't carry any."""
+    if msg.content_type == "tool_calls" and isinstance(msg.content, list):
+        return [to_dict(call) for call in msg.content]
+    return None
 
 class OpenAIStyleStrategy(LLMProviderStrategy):
     """A strategy for interacting with LLM providers that follow the OpenAI API format.
@@ -33,8 +41,29 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
         Returns:
             Dict[str, List[Dict]]: The messages in the provider's format.
         """
-        processed_messages = [to_dict(msg) for msg in messages.messages]
-        return {"messages": processed_messages}
+        return {"messages": [self._message(msg) for msg in messages.messages]}
+
+    @staticmethod
+    def _message(msg: OrkesMessageSchema) -> Dict:
+        """One message in OpenAI's format, with only the fields it accepts."""
+        calls = _tool_calls(msg)
+        if calls is not None:
+            return {
+                "role": msg.role,
+                "content": None,
+                "tool_calls": [{
+                    "id": call.get("id"),
+                    "type": "function",
+                    "function": {
+                        "name": call["function_name"],
+                        "arguments": json.dumps(call.get("arguments", {})),
+                    },
+                } for call in calls],
+            }
+        out = {"role": msg.role, "content": msg.content}
+        if msg.tool_call_id is not None:
+            out["tool_call_id"] = msg.tool_call_id
+        return out
 
     def get_tools_payload(self, tools: List[OrkesToolSchema]) -> List[Dict]:
         """Converts a list of OrkesToolSchema objects into the format expected by an
@@ -96,7 +125,8 @@ class OpenAIStyleStrategy(LLMProviderStrategy):
                 for tool_call in message['tool_calls']:
                     tool_schema = ToolCallSchema(
                         function_name=tool_call['function']['name'],
-                        arguments=json.loads(tool_call['function']['arguments'])
+                        arguments=json.loads(tool_call['function']['arguments']),
+                        id=tool_call.get('id'),
                     )
                     tools_called.append(tool_schema)
                 return RequestSchema(content_type="tool_calls", content=tools_called)
@@ -153,10 +183,32 @@ class AnthropicStrategy(LLMProviderStrategy):
         Returns:
             Dict[str, Union[str, List[Dict]]]: The messages in the provider's format.
         """
-        processed_messages = [to_dict(msg) for msg in messages.messages]
+        system_msg = next((msg.content for msg in messages.messages if msg.role == 'system'), None)
 
-        system_msg = next((msg['content'] for msg in processed_messages if msg['role'] == 'system'), None)
-        chat_messages = [msg for msg in processed_messages if msg['role'] != 'system']
+        chat_messages = []
+        for msg in messages.messages:
+            if msg.role == 'system':
+                continue
+            calls = _tool_calls(msg)
+            if calls is not None:
+                chat_messages.append({"role": "assistant", "content": [{
+                    "type": "tool_use",
+                    "id": call.get("id"),
+                    "name": call["function_name"],
+                    "input": call.get("arguments", {}),
+                } for call in calls]})
+            elif msg.role == 'tool':
+                # Anthropic takes tool results as user content blocks; results of
+                # one turn's parallel calls go together in a single user message.
+                block = {"type": "tool_result", "tool_use_id": msg.tool_call_id, "content": msg.content}
+                last = chat_messages[-1] if chat_messages else None
+                if last and last["role"] == "user" and isinstance(last["content"], list) \
+                        and all(b.get("type") == "tool_result" for b in last["content"]):
+                    last["content"].append(block)
+                else:
+                    chat_messages.append({"role": "user", "content": [block]})
+            else:
+                chat_messages.append({"role": msg.role, "content": msg.content})
 
         message_payload = {"messages": chat_messages}
         if system_msg:
@@ -233,6 +285,7 @@ class AnthropicStrategy(LLMProviderStrategy):
                     tool_schema = ToolCallSchema(
                         function_name=block['name'],
                         arguments=block.get('input', {}),
+                        id=block.get('id'),
                     )
                     tools_called.append(tool_schema)
 
@@ -378,7 +431,8 @@ class GoogleGeminiStrategy(LLMProviderStrategy):
                     fc = part['functionCall']
                     tool_schema = ToolCallSchema(
                         function_name=fc['name'],
-                        arguments=fc.get('args', {})
+                        arguments=fc.get('args', {}),
+                        id=fc.get('id'),
                     )
                     tools_called.append(tool_schema)
 

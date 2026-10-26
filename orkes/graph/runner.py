@@ -335,7 +335,9 @@ class GraphRunner:
         than a direct argument.
         """
         if isinstance(node, AggregationNode):
-            branch_results = self._pending_branch_results
+            # Empty when the node is reached without going through its fork
+            # (e.g. a loop back into it).
+            branch_results = self._pending_branch_results or {}
             self._pending_branch_results = None
             return _check_node_result(node, node.execute(input_state, branch_results))
         return _check_node_result(node, node.execute(input_state))
@@ -378,7 +380,7 @@ class GraphRunner:
         which itself handles sync and async node functions uniformly.
         """
         if isinstance(node, AggregationNode):
-            branch_results = self._pending_branch_results
+            branch_results = self._pending_branch_results or {}
             self._pending_branch_results = None
             return _check_node_result(node, await node.aexecute(input_state, branch_results))
         return _check_node_result(node, await node.aexecute(input_state))

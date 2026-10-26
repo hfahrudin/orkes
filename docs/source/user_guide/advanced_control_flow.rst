@@ -129,7 +129,7 @@ Orkes supports branching a graph into multiple independent paths, a pattern also
 
 You can implement this using the `add_parallel_edges` method, which splits the execution into multiple paths. All parallel branches must eventually converge into a single `aggregation_node`.
 
-The aggregation node's function **must** accept a second parameter, ``branch_results`` -- a ``dict`` keyed by each branch's entry-node name (the strings passed in ``to_nodes``), mapping to that branch's complete final state. ``compile()`` raises a ``TypeError`` if this parameter is missing, because without it there is no way to tell whether a branch's output was discarded intentionally or by accident. You are not required to *use* ``branch_results`` inside the function -- ``return state`` unchanged is a valid choice if you genuinely don't need branch output -- but the parameter must be declared.
+The aggregation node's function **must** accept a second parameter, ``branch_results`` -- a ``dict`` keyed by each branch's entry-node name (the strings passed in ``to_nodes``), mapping to that branch's complete final state. ``compile()`` raises a ``TypeError`` if this parameter is missing, because without it there is no way to tell whether a branch's output was discarded intentionally or by accident. You are not required to *use* ``branch_results`` inside the function -- ``return state`` unchanged is a valid choice if you genuinely don't need branch output -- but the parameter must be declared. If the aggregation node is reached without going through its fork (for example, a loop that routes back into it), ``branch_results`` is an empty ``dict``.
 
 .. code-block:: python
 
