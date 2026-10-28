@@ -19,6 +19,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# WatcherSink (orkes.exporters.watcher): sends traces to Orkes Watcher.
+watcher = [
+    "requests",
+]
 dev = [
     "pytest",
     "pytest-html",
@@ -28,6 +32,7 @@ dev = [
     "fastapi",
     "uvicorn",
     "python-dotenv",
+    "jsonschema",
     "langgraph",
     "langchain",
     "matplotlib"

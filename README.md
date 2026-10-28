@@ -99,6 +99,36 @@ At the heart of Orkes is a powerful graph-based architecture inspired by `Networ
 -   **Familiar Interface**: The graph-based interface is inspired by `NetworkX`, providing a familiar and powerful paradigm for those with experience in graph-based programming.
 
 
+## Sending Traces to Orkes Watcher
+
+[Orkes Watcher](https://github.com/hfahrudin/orkes-watcher) is a dashboard that shows your runs live and keeps their history. Install the extra and attach a `WatcherSink` to your graph; nothing else in your code changes:
+
+```bash
+pip install "orkes[watcher]"
+```
+
+```python
+from orkes.exporters.watcher import WatcherSink
+
+sink = WatcherSink(api_key="<project ingest key>", base_url="http://localhost:8000")
+graph = OrkesGraph(SearchState, name="search", trace_sinks=[sink])
+```
+
+`base_url` is the watcher backend (port `8000` by default), not the dashboard. Create one sink and reuse it for all your graphs and runs. Sending happens in a background thread, and a watcher that is down or rejects the data never affects your run: at most, a run waits up to 3 seconds at the end for its data to be sent.
+
+**State snapshots, prompts and LLM replies are sent as they are.** To leave out secrets or personal data, pass `redact`, a function that receives each event (and each node entry) as a dict and returns what should be sent:
+
+```python
+def redact(event):
+    if "state_snapshot" in event:
+        event = {**event, "state_snapshot": {"redacted": True}}
+    return event
+
+sink = WatcherSink(api_key=..., base_url=..., redact=redact)
+```
+
+Any object with `on_run_start`, `on_edge` and `on_run_end` methods can be a trace sink; see `orkes.exporters.TraceSink`.
+
 ## Benchmarks
 
 Orkes has been benchmarked against LangGraph on simple graph structures, demonstrating performance advantages. In direct comparisons of graphs with identical nodes and edges, Orkes consistently outperforms LangGraph in both latency and memory utilization.

@@ -1,8 +1,6 @@
-
-
 import copy
 import dataclasses
-import json
+import logging
 import time
 import uuid
 import os
@@ -10,10 +8,15 @@ from collections.abc import Mapping
 from typing import Dict, Union, Optional
 from orkes.graph.unit import ForwardEdge, ConditionalEdge
 from orkes.graph.schema import NodePoolItem, TracesSchema
-from orkes.shared.schema import to_dict
+from orkes.shared.schema import to_dict, to_json
 from orkes.graph.unit import _EndNode, _StartNode, AggregationNode
 from orkes.visualizer.generator import TraceInspector
 from orkes.shared.context import trace_var, edge_id_var, edge_trace_var
+
+logger = logging.getLogger("orkes")
+
+# Cap on a run's `error` text (message plus traceback), in bytes.
+MAX_ERROR_BYTES = 8 * 1024
 
 
 def _snapshot(state: Dict) -> Dict:
@@ -36,7 +39,25 @@ def _describe_edge(edge) -> str:
 
 
 def _format_error(error: BaseException) -> str:
+    """The exception as "ExceptionType: message"."""
     return f"{type(error).__name__}: {error}"
+
+
+def _format_error_with_traceback(error: BaseException) -> str:
+    """"ExceptionType: message", a newline, then the traceback. Capped at
+    MAX_ERROR_BYTES by cutting the oldest frames, so the line that raised stays."""
+    import traceback  # imported here: only needed when a run fails
+
+    header = _format_error(error)
+    tb = "Traceback (most recent call last):\n" + "".join(traceback.format_tb(error.__traceback__))
+    text = f"{header}\n{tb}"
+    if len(text.encode()) <= MAX_ERROR_BYTES:
+        return text
+    prefix = f"{header}\n...\n"
+    budget = MAX_ERROR_BYTES - len(prefix.encode())
+    if budget <= 0:
+        return header.encode()[:MAX_ERROR_BYTES].decode(errors="ignore")
+    return prefix + tb.encode()[-budget:].decode(errors="ignore")
 
 
 def _check_node_result(node, result) -> Dict:
@@ -69,7 +90,7 @@ class GraphRunner:
         trace_inspector (TraceInspector): An object to generate a visualization of the trace.
     """
 
-    def __init__(self, graph_name: str, graph_description: str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir: str = "traces", auto_save_trace: bool = False, traced: bool = True):
+    def __init__(self, graph_name: str, graph_description: str, nodes_pool: Dict[str, NodePoolItem], graph_type: Dict, traces_dir: str = "traces", auto_save_trace: bool = False, traced: bool = True, trace_sinks: Optional[list] = None):
         """Initializes the GraphRunner.
 
         Args:
@@ -81,6 +102,8 @@ class GraphRunner:
             auto_save_trace (bool, optional): Whether to automatically save traces.
                                             Defaults to False.
             traced (bool, optional): Whether to enable tracing. Defaults to True.
+            trace_sinks (list, optional): Objects that receive the trace as the
+                run happens (see `orkes.exporters.TraceSink`).
         """
         self.state_def = graph_type
         self.nodes_pool = nodes_pool
@@ -103,6 +126,8 @@ class GraphRunner:
         # runner (not on the shared Edge objects) so separate compile()'d
         # runners and sequential runs never share counters.
         self._edge_passes: Dict[str, int] = {}
+        self._failed_node: Optional[str] = None
+        self.trace_sinks = list(trace_sinks or [])
         self._running = False
         self.has_async_components = self._compute_has_async_components(nodes_pool)
 
@@ -127,6 +152,7 @@ class GraphRunner:
         self.run_number = 0
         self._edge_passes = {}
         self._pending_branch_results = None
+        self._failed_node = None
         # Copy so the caller's dict isn't modified in place.
         self.graph_state = dict(invoke_state)
         if self.traced:
@@ -139,10 +165,35 @@ class GraphRunner:
             self.trace.status = "FINISHED"
         else:
             self.trace.status = "FAILED"
-            self.trace.error = _format_error(error)
+            self.trace.error = _format_error_with_traceback(error)
+            self.trace.failed_node = self._failed_node
         self.trace.elapsed_time = time.time() - self.trace.start_time
         if self.auto_save_trace:
             self.save_run_trace()
+
+    def _notify_sinks(self, method: str, *args) -> None:
+        """Calls `method` on every trace sink. A failing sink is logged and
+        skipped, so it can never break the run."""
+        for sink in self.trace_sinks:
+            try:
+                getattr(sink, method)(*args)
+            except Exception:
+                logger.warning("Trace sink %r failed in %s", sink, method, exc_info=True)
+
+    def _timed_node(self, node, input_state, edge_trace) -> Dict:
+        """Runs a node, recording only its own run time as `node_elapsed`."""
+        start = time.perf_counter()
+        result = self._execute_node(node, input_state)
+        edge_trace.node_elapsed = time.perf_counter() - start
+        return result
+
+    async def _atimed_node(self, node, input_state, edge_trace) -> Dict:
+        """Async counterpart to `_timed_node`; `edge_trace` is None when untraced."""
+        start = time.perf_counter()
+        result = await self._aexecute_node(node, input_state)
+        if edge_trace is not None:
+            edge_trace.node_elapsed = time.perf_counter() - start
+        return result
 
     def _count_pass(self, edge) -> int:
         """Counts one traversal of `edge` in this run and returns the new count.
@@ -180,6 +231,8 @@ class GraphRunner:
         edge_trace.edge_run_number = self.run_number
         edge_trace.passes_left = edge.max_passes - passes
         edge_trace.state_snapshot = _snapshot(input_state)
+        if isinstance(edge.from_node.node, _StartNode):
+            edge_trace.node_elapsed = 0.0  # START runs no function
         return edge_trace
 
     @staticmethod
@@ -207,8 +260,7 @@ class GraphRunner:
             os.makedirs(self.traces_dir)
         filename = os.path.join(self.traces_dir, f"trace_{self.run_id}.json")
         with open(filename, 'w', encoding='utf-8') as f:
-            # default=str: state can hold values JSON can't encode (datetime, custom objects).
-            json.dump(to_dict(self.trace), f, indent=4, default=str)
+            f.write(to_json(self.trace, indent=4))
 
     def visualize_trace(self):
         """Generates an HTML visualization of the execution trace."""
@@ -257,6 +309,7 @@ class GraphRunner:
                 self.traverse_graph(start_edge, self.graph_state.copy())
                 return self.graph_state
 
+            self._notify_sinks("on_run_start", self.trace)
             token = trace_var.set(self.trace)
             error = None
             try:
@@ -267,6 +320,7 @@ class GraphRunner:
             finally:
                 trace_var.reset(token)
                 self._end_run(error)
+                self._notify_sinks("on_run_end", self.trace)
 
             return self.graph_state
         finally:
@@ -307,6 +361,7 @@ class GraphRunner:
                 await self.atraverse_graph(start_edge, self.graph_state.copy())
                 return self.graph_state
 
+            self._notify_sinks("on_run_start", self.trace)
             token = trace_var.set(self.trace)
             error = None
             try:
@@ -317,6 +372,11 @@ class GraphRunner:
             finally:
                 trace_var.reset(token)
                 self._end_run(error)
+                if self.trace_sinks:
+                    import asyncio  # imported here: keeps `import orkes.graph` light
+
+                    # A sink may wait briefly to finish sending; keep that off the event loop.
+                    await asyncio.to_thread(self._notify_sinks, "on_run_end", self.trace)
 
             return self.graph_state
         finally:
@@ -449,18 +509,19 @@ class GraphRunner:
                 if self.traced:
                     edge_trace = self._new_edge_trace(current_edge, passes, input_state)
                     start = time.time()
+                    edge_trace.started_at = start
                     edge_trace_token = edge_trace_var.set(edge_trace)
 
                 try:
                     if current_edge.edge_type == "__forward__":
                         if not isinstance(current_node, _StartNode):
-                            result = await self._aexecute_node(current_node, input_state)
+                            result = await self._atimed_node(current_node, input_state, edge_trace)
                             self.graph_state.update(result)
 
                         next_edge = current_edge.to_node.edge
                         next_node = current_edge.to_node.node
                     elif current_edge.edge_type == "__conditional__":
-                        result = await self._aexecute_node(current_node, input_state)
+                        result = await self._atimed_node(current_node, input_state, edge_trace)
                         self.graph_state.update(result)
 
                         gate_function = current_edge.gate_function
@@ -483,7 +544,7 @@ class GraphRunner:
                             edge_trace.to_node = next_node_name
                     elif current_edge.edge_type == "__parallel__":
                         if not isinstance(current_node, _StartNode):
-                            result = await self._aexecute_node(current_node, input_state)
+                            result = await self._atimed_node(current_node, input_state, edge_trace)
                             self.graph_state.update(result)
 
                         if self.traced:
@@ -507,6 +568,13 @@ class GraphRunner:
                         # Recorded even on failure, so the failing edge shows in the trace.
                         edge_trace.elapsed = time.time() - start
                         self.trace.edges_trace.append(edge_trace)
+                        if self.trace_sinks:
+                            self._notify_sinks("on_edge", edge_trace)
+            except BaseException:
+                # Innermost edge wins: a failing branch is named, not its parallel edge.
+                if self._failed_node is None:
+                    self._failed_node = current_node.name
+                raise
             finally:
                 if self.traced:
                     edge_id_var.reset(edge_token)
@@ -611,17 +679,18 @@ class GraphRunner:
                 passes = self._count_pass(current_edge)
                 edge_trace = self._new_edge_trace(current_edge, passes, input_state)
                 start = time.time()
+                edge_trace.started_at = start
                 edge_trace_token = edge_trace_var.set(edge_trace)
                 try:
                     if current_edge.edge_type == "__forward__":
                         if not isinstance(current_node, _StartNode):
-                            result = self._execute_node(current_node, input_state)
+                            result = self._timed_node(current_node, input_state, edge_trace)
                             self.graph_state.update(result)
 
                         next_edge = current_edge.to_node.edge
                         next_node = current_edge.to_node.node
                     elif current_edge.edge_type == "__conditional__":
-                        result = self._execute_node(current_node, input_state)
+                        result = self._timed_node(current_node, input_state, edge_trace)
                         self.graph_state.update(result)
 
                         gate_function = current_edge.gate_function
@@ -640,7 +709,7 @@ class GraphRunner:
                         edge_trace.to_node = next_node_name
                     elif current_edge.edge_type == "__parallel__":
                         if not isinstance(current_node, _StartNode):
-                            result = self._execute_node(current_node, input_state)
+                            result = self._timed_node(current_node, input_state, edge_trace)
                             self.graph_state.update(result)
 
                         # Record the parallel branch starting points in the trace
@@ -661,6 +730,13 @@ class GraphRunner:
                     # Recorded even on failure, so the failing edge shows in the trace.
                     edge_trace.elapsed = time.time() - start
                     self.trace.edges_trace.append(edge_trace)
+                    if self.trace_sinks:
+                        self._notify_sinks("on_edge", edge_trace)
+            except BaseException:
+                # Innermost edge wins: a failing branch is named, not its parallel edge.
+                if self._failed_node is None:
+                    self._failed_node = current_node.name
+                raise
             finally:
                 edge_id_var.reset(edge_token)
 

@@ -110,6 +110,10 @@ class EdgeTrace:
                                                      edge's execution.
         error (str | None): The exception raised while traversing this edge,
             as "ExceptionType: message", or None if it succeeded.
+        started_at (float | None): Unix time (seconds) when the traversal started.
+        node_elapsed (float | None): Seconds spent in the source node's function
+            only (not the conditional gate or parallel branches). None if the
+            node never finished.
     """
     edge_id: str
     edge_run_number: int
@@ -123,6 +127,8 @@ class EdgeTrace:
     function_traces: List[FunctionTraceSchema] = field(default_factory=list)
     llm_traces: List[LLMTraceSchema] = field(default_factory=list)
     error: Optional[str] = None
+    started_at: Optional[float] = None
+    node_elapsed: Optional[float] = None
 
 
 @dataclass(kw_only=True)
@@ -145,7 +151,10 @@ class TracesSchema:
         nodes_trace (list[NodeTrace]): Traces for all nodes executed during the run.
         edges_trace (list[EdgeTrace]): Traces for all edges traversed during the run.
         error (str | None): The exception that failed the run, as
-            "ExceptionType: message", or None if it finished.
+            "ExceptionType: message", a newline and the traceback (capped at
+            8 KB), or None if it finished.
+        failed_node (str | None): The source node of the edge in progress when
+            the run failed, or None if it finished.
     """
     graph_name: str
     graph_description: str
@@ -156,3 +165,4 @@ class TracesSchema:
     nodes_trace: list[NodeTrace]
     edges_trace: list[EdgeTrace]
     error: Optional[str] = None
+    failed_node: Optional[str] = None

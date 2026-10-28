@@ -173,7 +173,8 @@ def _assert_failed_trace(runner):
     trace = runner.trace
     assert trace.status == "FAILED"
     assert trace.elapsed_time > 0
-    assert trace.error == "Boom: node exploded"
+    assert trace.error.startswith("Boom: node exploded\nTraceback (most recent call last):")
+    assert trace.failed_node == "node"
     failing_edge = trace.edges_trace[-1]
     assert failing_edge.from_node == "node"
     assert failing_edge.error == "Boom: node exploded"
@@ -203,7 +204,8 @@ def test_failed_run_is_auto_saved(tmp_path):
         runner.run({"n": 0, "items": []})
     saved = json.loads((tmp_path / f"trace_{runner.run_id}.json").read_text())
     assert saved["status"] == "FAILED"
-    assert saved["error"] == "Boom: node exploded"
+    assert saved["error"].startswith("Boom: node exploded\n")
+    assert saved["failed_node"] == "node"
 
 
 def test_successful_run_has_no_error():

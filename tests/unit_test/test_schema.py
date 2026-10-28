@@ -132,10 +132,11 @@ def test_trace_json_keeps_its_fields():
     trace = json.loads(json.dumps(to_dict(runner.trace), default=str))
     assert set(trace) == {
         "graph_name", "graph_description", "run_id", "start_time", "elapsed_time",
-        "status", "nodes_trace", "edges_trace", "error",
+        "status", "nodes_trace", "edges_trace", "error", "failed_node",
     }
     assert set(trace["nodes_trace"][0]) == {"node_name", "node_id", "node_description", "meta"}
     assert set(trace["edges_trace"][0]) == {
         "edge_id", "edge_run_number", "from_node", "to_node", "passes_left", "edge_type",
         "elapsed", "state_snapshot", "meta", "function_traces", "llm_traces", "error",
+        "started_at", "node_elapsed",
     }

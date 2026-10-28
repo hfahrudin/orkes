@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, Dict, List, Optional, Callable, Union
 
@@ -22,6 +23,15 @@ def to_dict(obj: Any, exclude: tuple = ()) -> Any:
     if isinstance(obj, dict):
         return {k: to_dict(v) for k, v in obj.items()}
     return obj
+
+
+def to_json(obj: Any, **kwargs) -> str:
+    """Serializes a schema object (or plain data) to JSON. Values JSON can't
+    encode, such as datetimes or custom objects in state, are written with `str()`.
+
+    The one serializer for traces, used both for saved trace files and by sinks.
+    """
+    return json.dumps(to_dict(obj), default=str, **kwargs)
 
 
 @dataclass(kw_only=True)

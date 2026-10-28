@@ -196,4 +196,7 @@ async def create_claude_message(request: ClaudeRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import sys
+
+    # Port from the command line (tests pass a free one); 8000 by default.
+    uvicorn.run(app, host="127.0.0.1", port=int(sys.argv[1]) if len(sys.argv) > 1 else 8000)

@@ -324,7 +324,7 @@ class AnthropicStrategy(LLMProviderStrategy):
             if data['type'] == 'content_block_delta':
                 return data['delta'].get('text', '')
             return None
-        except:
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
             return None
 
 class GoogleGeminiStrategy(LLMProviderStrategy):

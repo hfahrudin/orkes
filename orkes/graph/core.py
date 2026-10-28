@@ -1,4 +1,4 @@
-from typing import Callable, Union, Dict, List
+from typing import Callable, Union, Dict, List, Optional
 from orkes.graph.utils import function_assertion, is_typeddict_class
 from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode, ParallelEdge, AggregationNode
 from orkes.graph.schema import NodePoolItem
@@ -44,7 +44,7 @@ class OrkesGraph:
         {'messages': ['Hello from node1', 'Hello from node2']}
     """
 
-    def __init__(self, state, name: str = "default_graph", description: str = "", traced: bool = True):
+    def __init__(self, state, name: str = "default_graph", description: str = "", traced: bool = True, trace_sinks: Optional[List] = None):
         """Initializes an OrkesGraph.
 
         Args:
@@ -52,13 +52,19 @@ class OrkesGraph:
             name (str, optional): The name of the graph. Defaults to "default_graph".
             description (str, optional): A description of the graph. Defaults to "".
             traced (bool, optional): Whether to trace the graph execution. Defaults to True.
+            trace_sinks (list, optional): Objects that receive each run's trace as it
+                happens, e.g. `orkes.exporters.watcher.WatcherSink`. Requires `traced=True`.
 
         Raises:
             TypeError: If the state is not a TypedDict class.
+            ValueError: If `trace_sinks` is given with `traced=False`.
         """
         self.state = state
         self.name = name
         self.traced = traced
+        if trace_sinks and not traced:
+            raise ValueError("trace_sinks need tracing; remove traced=False to use them.")
+        self.trace_sinks = list(trace_sinks or [])
         self.description = description
         self.id = "graph_" + str(uuid.uuid4())
         self.START = _StartNode(self.state)
@@ -353,7 +359,8 @@ class OrkesGraph:
                            graph_description=self.description,
                            nodes_pool=self._nodes_pool,
                            graph_type=self.state,
-                           traced=self.traced)
+                           traced=self.traced,
+                           trace_sinks=self.trace_sinks)
 
     def detect_loop(self):
         """Detects loops in the graph.
