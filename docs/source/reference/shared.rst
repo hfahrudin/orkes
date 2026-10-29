@@ -19,7 +19,6 @@ Schemas
    OrkesToolSchema
    OrkesMessageSchema
    OrkesMessagesSchema
-   ToolDefinition
 
 Utilities
 ---------
@@ -29,8 +28,6 @@ Utilities
 
    format_start_time
    format_elapsed_time
-   get_instances_from_func
-   create_dict_from_typeddict
 
 
 Context

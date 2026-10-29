@@ -1,12 +1,12 @@
-from pydantic import BaseModel
+from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING, Union, List, Dict, Any
 from orkes.shared.schema import OrkesMessagesSchema, RequestSchema
-from datetime import datetime
 
 if TYPE_CHECKING:
     from orkes.graph.unit import Node, Edge
 
-class NodePoolItem(BaseModel):
+@dataclass(kw_only=True, eq=False)
+class NodePoolItem:
     """
     Represents an item in the node pool, which is a collection of nodes and their
     associated edges within the graph. Each item encapsulates a node and an optional
@@ -22,11 +22,8 @@ class NodePoolItem(BaseModel):
     node: "Node"
     edge: Optional[Union["Edge", str]] = None
 
-    model_config = {
-        "arbitrary_types_allowed": True
-    }
-
-class NodeTrace(BaseModel):
+@dataclass(kw_only=True)
+class NodeTrace:
     """
     Represents the trace of a single node's execution within the graph. It captures
     key information about the node for logging, debugging, and visualization purposes.
@@ -44,7 +41,8 @@ class NodeTrace(BaseModel):
     node_description: Optional[str] = None
     meta: dict
 
-class LLMTraceSchema(BaseModel):
+@dataclass(kw_only=True)
+class LLMTraceSchema:
     """
     Represents the input and output of an LLM interaction for tracking purposes.
 
@@ -63,7 +61,8 @@ class LLMTraceSchema(BaseModel):
     settings: Optional[Dict] = None
 
 
-class FunctionTraceSchema(BaseModel):
+@dataclass(kw_only=True)
+class FunctionTraceSchema:
     """
     Represents the trace of a single function's execution, capturing its inputs,
     output, and timing.
@@ -81,7 +80,8 @@ class FunctionTraceSchema(BaseModel):
     return_value: Any
     elapsed: float
 
-class EdgeTrace(BaseModel):
+@dataclass(kw_only=True)
+class EdgeTrace:
     """
     Represents the trace of a single edge traversal during a graph execution.
 
@@ -108,6 +108,12 @@ class EdgeTrace(BaseModel):
         function_traces (list[FunctionTraceSchema]): A list of function traces
                                                      that occurred during this
                                                      edge's execution.
+        error (str | None): The exception raised while traversing this edge,
+            as "ExceptionType: message", or None if it succeeded.
+        started_at (float | None): Unix time (seconds) when the traversal started.
+        node_elapsed (float | None): Seconds spent in the source node's function
+            only (not the conditional gate or parallel branches). None if the
+            node never finished.
     """
     edge_id: str
     edge_run_number: int
@@ -116,13 +122,17 @@ class EdgeTrace(BaseModel):
     passes_left: int
     edge_type: Union[str, None]
     elapsed: float
-    state_snapshot: dict = {}
+    state_snapshot: dict = field(default_factory=dict)
     meta: dict
-    function_traces: List[FunctionTraceSchema] = []
-    llm_traces: List[LLMTraceSchema] = []
+    function_traces: List[FunctionTraceSchema] = field(default_factory=list)
+    llm_traces: List[LLMTraceSchema] = field(default_factory=list)
+    error: Optional[str] = None
+    started_at: Optional[float] = None
+    node_elapsed: Optional[float] = None
 
 
-class TracesSchema(BaseModel):
+@dataclass(kw_only=True)
+class TracesSchema:
     """
     Represents the complete execution trace of a graph run.
 
@@ -140,8 +150,13 @@ class TracesSchema(BaseModel):
         status (str): Final execution status (e.g., "SUCCESS", "FAILED").
         nodes_trace (list[NodeTrace]): Traces for all nodes executed during the run.
         edges_trace (list[EdgeTrace]): Traces for all edges traversed during the run.
+        error (str | None): The exception that failed the run, as
+            "ExceptionType: message", a newline and the traceback (capped at
+            8 KB), or None if it finished.
+        failed_node (str | None): The source node of the edge in progress when
+            the run failed, or None if it finished.
     """
-    graph_name : str
+    graph_name: str
     graph_description: str
     run_id: str
     start_time: float = 0.0
@@ -149,3 +164,5 @@ class TracesSchema(BaseModel):
     status: str = "FAILED"
     nodes_trace: list[NodeTrace]
     edges_trace: list[EdgeTrace]
+    error: Optional[str] = None
+    failed_node: Optional[str] = None

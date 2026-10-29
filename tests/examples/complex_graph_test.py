@@ -57,7 +57,7 @@ def sub_branch_a2(state: ComplexState) -> ComplexState:
     state['branch_a_sub_branch_counters'][1] += 1
     return state
 
-def branch_a_aggregator(state: ComplexState) -> ComplexState:
+def branch_a_aggregator(state: ComplexState, branch_results) -> ComplexState:
     print("Branch A aggregator")
     return state
 
@@ -89,11 +89,11 @@ def sub_branch_b2(state: ComplexState) -> ComplexState:
     state['branch_b_sub_branch_counters'][1] += 1
     return state
 
-def branch_b_aggregator(state: ComplexState) -> ComplexState:
+def branch_b_aggregator(state: ComplexState, branch_results) -> ComplexState:
     print("Branch B aggregator")
     return state
 
-def main_aggregator(state: ComplexState) -> ComplexState:
+def main_aggregator(state: ComplexState, branch_results) -> ComplexState:
     print("Main aggregator")
     return state
 

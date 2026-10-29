@@ -1,28 +1,9 @@
-import subprocess
-import time
-import os
 import pytest
-import json
 from orkes.services.connectors import LLMFactory
 from orkes.shared.schema import OrkesMessagesSchema, OrkesMessageSchema
 
-from dotenv import load_dotenv
 
-import sys
-@pytest.fixture(scope="module")
-def mock_server():
-    # Start the mock server in a separate process
-    mock_server_path = os.path.join(os.path.dirname(__file__), '..', 'mock_servers', 'mock_llm_server.py')
-    server_process = subprocess.Popen([sys.executable, mock_server_path])
-
-    # Give the server a moment to start
-    time.sleep(5)
-
-    yield "http://localhost:8000"
-
-    # Terminate the mock server process
-    server_process.terminate()
-    server_process.wait()
+# `mock_server` (the mock LLM server's URL) comes from conftest.py.
 
 @pytest.mark.asyncio
 async def test_openai_style_connection_with_schema(mock_server):

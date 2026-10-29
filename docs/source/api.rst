@@ -7,6 +7,7 @@ schema.
 The following subpackages are available:
 
 * ``orkes.agents``: Agent Boilerplates to build to modularized agentic flow.
+* ``orkes.exporters``: Trace sinks that receive a run's trace as it happens, including ``WatcherSink`` for Orkes Watcher.
 * ``orkes.graph``: Public API for graph orchestration and plotting.
 * ``orkes.services``: Service-layer functions and utility classes.
 * ``orkes.shared``: Shared utilities and core extension classes.
@@ -18,6 +19,7 @@ The following subpackages are available:
    :hidden:
    
    reference/agents
+   reference/exporters
    reference/graph
    reference/services
    reference/shared

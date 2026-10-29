@@ -27,7 +27,6 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx_copybutton',
-    'sphinxcontrib.autodoc_pydantic',
     'sphinx.ext.autosummary',
     'sphinxcontrib.mermaid'
 ]
@@ -63,8 +62,6 @@ project = "orkes"
 copyright = f'{datetime.now().year}, orkes '
 
 
-autodoc_pydantic_model_show_json = False
-autodoc_pydantic_settings_show_json = False
 
 autodoc_default_options = {
     'imported-members': False, 

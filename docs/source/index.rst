@@ -12,9 +12,11 @@ Orkes Documentations
 What's New
 ==========
 
-- **Graph Traceability**: This feature introduces a powerful visualization tool for debugging and understanding graph executions. When a graph is run, it can now generate a detailed execution trace, capturing the state, timing, and data flow at every step. This trace is then used to create a self-contained, interactive HTML file that provides a visual representation of the graph's execution.
-
-- **API Overhaul**: The library's core API has been fundamentally redesigned to be more flexible, observable, and intuitive. The previous agent-centric, linear execution model has been replaced with a new graph-based architecture centered around the ``OrkesGraph`` class.
+- **Orkes Watcher Export**: stream runs to a live dashboard with ``WatcherSink``. See :ref:`orkes_watcher`.
+- **Richer Traces**: failed runs record the traceback and failing node; steps record node time.
+- **Lighter Graph API**: no third-party dependencies; LLM requests now have timeouts.
+- **Graph Traceability**: every run can be viewed as an interactive HTML trace.
+- **API Overhaul**: a graph-based API built around ``OrkesGraph``.
 
 Roadmap
 =======
@@ -32,9 +34,9 @@ Roadmap
    * - Parallel Graph Execution
      - Enhance the graph runner to support parallel execution of independent branches for improved performance.
      - Implemented
-   * - Tracer Web Platform
-     - Develop a standalone web-based platform for visualizing and inspecting graph traces in real-time.
-     - Progressing
+   * - Orkes Watcher Export
+     - Stream graph traces to Orkes Watcher, a separate web platform for inspecting runs live and across history.
+     - Implemented
 
 
 
