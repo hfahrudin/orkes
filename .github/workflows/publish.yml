@@ -1,0 +1,81 @@
+name: Publish to PyPI
+
+# Runs on every push to main, but only publishes when the version in
+# pyproject.toml is not on PyPI yet. To release: bump the version and add
+# changelogs/<version>.md, which becomes the GitHub Release notes.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Check if version is already on PyPI
+        id: check
+        run: |
+          version=$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/orkes/$version/json")
+          if [ "$status" = "200" ]; then
+            echo "orkes $version is already on PyPI, skipping"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "orkes $version is new, will publish"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check changelog exists
+        if: steps.check.outputs.should_publish == 'true'
+        run: |
+          file="changelogs/${{ steps.check.outputs.version }}.md"
+          if [ ! -s "$file" ]; then
+            echo "Missing or empty $file. Write the release notes before releasing."
+            exit 1
+          fi
+
+      - if: steps.check.outputs.should_publish == 'true'
+        run: uv build
+
+      - if: steps.check.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    if: needs.build.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # needed for PyPI Trusted Publishing
+      contents: write  # needed to create the GitHub Release and tag
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "v$VERSION" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file "changelogs/$VERSION.md"
+
+      - name: Create release branch
+        run: git push origin "$GITHUB_SHA:refs/heads/release-$VERSION"

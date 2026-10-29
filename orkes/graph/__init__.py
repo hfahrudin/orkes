@@ -8,8 +8,8 @@ from .schema import (
     EdgeTrace,
     TracesSchema
 )
-from .unit import Node, Edge, ForwardEdge, ConditionalEdge, ParallelEdge
-from .utils import orkes_tracable, function_assertion, is_typeddict_class, check_dict_values_type, randomize_color_hex
+from .unit import Node, AggregationNode, Edge, ForwardEdge, ConditionalEdge, ParallelEdge
+from .utils import orkes_tracable, function_assertion, is_typeddict_class
 
 __all__ = [
     "OrkesGraph",
@@ -21,6 +21,7 @@ __all__ = [
     "EdgeTrace",
     "TracesSchema",
     "Node",
+    "AggregationNode",
     "Edge",
     "ForwardEdge",
     "ConditionalEdge",
@@ -28,6 +29,4 @@ __all__ = [
     "orkes_tracable",
     "function_assertion",
     "is_typeddict_class",
-    "check_dict_values_type",
-    "randomize_color_hex",
 ]

@@ -264,6 +264,13 @@
         const nodes = new vis.DataSet(JSON_NODES);
         const edges = new vis.DataSet(JSON_EDGES);
         const container = document.getElementById('mynetwork');
+
+        // Escapes trace values before they're inserted as HTML.
+        function esc(value) {
+            return String(value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
         const network = new vis.Network(container, { nodes, edges }, {
             edges: { arrows: 'to', font: { size: 11, color: '#888' }, color: { inherit: 'both' }, smooth: true },
             physics: { enabled: true, solver: 'forceAtlas2Based' },
@@ -337,7 +344,7 @@
 
             if (params.nodes.length > 0) {
                 targetData = nodes.get(params.nodes[0]);
-                html = `<div class="card node-card"><h4>${targetData.label}</h4>`;
+                html = `<div class="card node-card"><h4>${esc(targetData.label)}</h4>`;
             } else if (params.edges.length > 0) {
                 targetData = edges.get(params.edges[0]);
                 html = `<div class="card edge-card"><h4>Edge</h4>`;
@@ -365,21 +372,21 @@
                                 if (key === 'llm_traces' ){
                                     html += `<div class="key collapsible" onclick="toggleCollapse(this)">LLM Trace ${index + 1}</div>`;
                                 } else{
-                                    function_name = trace['function_name']
-                                    html += `<div class="key collapsible" onclick="toggleCollapse(this)">${function_name}</div>`;
+                                    const function_name = trace['function_name']
+                                    html += `<div class="key collapsible" onclick="toggleCollapse(this)">${esc(function_name)}</div>`;
                                 }
                                 
                                 html += `<div class="value collapsible-content">`;
 
                                 for (let traceKey in trace) {
-                                    html += `<div class="prop-row llm-trace-inner-row">`; // Apply inner row style
                                     if (traceKey === 'function_name'){
                                         continue;
                                     }
+                                    html += `<div class="prop-row llm-trace-inner-row">`; // Apply inner row style
                                     // All inner LLM and function trace fields are collapsible
-                                    html += `<div class="key collapsible llm-trace-inner-key" onclick="toggleCollapse(this)">${traceKey}</div>`;
+                                    html += `<div class="key collapsible llm-trace-inner-key" onclick="toggleCollapse(this)">${esc(traceKey)}</div>`;
                                     html += `<div class="value collapsible-content">`;
-                                    let displayValue = JSON.stringify(trace[traceKey], null, 2);
+                                    let displayValue = esc(JSON.stringify(trace[traceKey], null, 2));
                                     if (traceKey === 'model') {
                                         html += `<pre class="json-box llm-model-name">${displayValue}</pre>`;
                                     } else {
@@ -408,11 +415,11 @@
                     } else if (singleLevelCollapsible.includes(key) && typeof val === 'object' && val !== null && (!Array.isArray(val) || val.length > 0)) {
                         html += `<div class="key collapsible" onclick="toggleCollapse(this)">${key}</div>`;
                         html += `<div class="value collapsible-content">`;
-                        html += `<pre class="json-box">${JSON.stringify(val, null, 2)}</pre>`;
+                        html += `<pre class="json-box">${esc(JSON.stringify(val, null, 2))}</pre>`;
                         html += `</div>`;
                     } else {
-                        let display = (typeof val === 'object' && val !== null) ? `<pre class="json-box">${JSON.stringify(val, null, 2)}</pre>` : val;
-                        html += `<span class="key">${key}:</span><div class="value">${display}</div>`;
+                        let display = (typeof val === 'object' && val !== null) ? `<pre class="json-box">${esc(JSON.stringify(val, null, 2))}</pre>` : esc(val);
+                        html += `<span class="key">${esc(key)}:</span><div class="value">${display}</div>`;
                     }
                     html += '</div>';
                 }

@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Union, Dict, Any, AsyncIterator, Iterator
 from orkes.services.schema import LLMInterface
-import uuid
 
 class AgentInterface(ABC):
     """Abstract base class for all agents.

@@ -1,25 +1,7 @@
-import subprocess
-import time
 import requests
-import os
-import pytest
 import json
 
-import sys
-@pytest.fixture(scope="module")
-def mock_server():
-    # Start the mock server in a separate process
-    mock_server_path = os.path.join(os.path.dirname(__file__), '..', 'mock_servers', 'mock_llm_server.py')
-    server_process = subprocess.Popen([sys.executable, mock_server_path])
-
-    # Give the server a moment to start
-    time.sleep(5)
-
-    yield "http://localhost:8000"
-
-    # Terminate the mock server process
-    server_process.terminate()
-    server_process.wait()
+# `mock_server` (the mock LLM server's URL) comes from conftest.py.
 
 
 def test_openai_chat_completions_streaming(mock_server):

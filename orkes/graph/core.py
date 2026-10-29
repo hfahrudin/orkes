@@ -1,6 +1,6 @@
-from typing import Callable, Union, Dict, List
+from typing import Callable, Union, Dict, List, Optional
 from orkes.graph.utils import function_assertion, is_typeddict_class
-from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode, ParallelEdge
+from orkes.graph.unit import Node, Edge, ForwardEdge, ConditionalEdge, _StartNode, _EndNode, ParallelEdge, AggregationNode
 from orkes.graph.schema import NodePoolItem
 from orkes.graph.runner import GraphRunner
 import uuid
@@ -44,7 +44,7 @@ class OrkesGraph:
         {'messages': ['Hello from node1', 'Hello from node2']}
     """
 
-    def __init__(self, state, name: str = "default_graph", description: str = "", traced: bool = True):
+    def __init__(self, state, name: str = "default_graph", description: str = "", traced: bool = True, trace_sinks: Optional[List] = None):
         """Initializes an OrkesGraph.
 
         Args:
@@ -52,13 +52,19 @@ class OrkesGraph:
             name (str, optional): The name of the graph. Defaults to "default_graph".
             description (str, optional): A description of the graph. Defaults to "".
             traced (bool, optional): Whether to trace the graph execution. Defaults to True.
+            trace_sinks (list, optional): Objects that receive each run's trace as it
+                happens, e.g. `orkes.exporters.watcher.WatcherSink`. Requires `traced=True`.
 
         Raises:
             TypeError: If the state is not a TypedDict class.
+            ValueError: If `trace_sinks` is given with `traced=False`.
         """
         self.state = state
         self.name = name
         self.traced = traced
+        if trace_sinks and not traced:
+            raise ValueError("trace_sinks need tracing; remove traced=False to use them.")
+        self.trace_sinks = list(trace_sinks or [])
         self.description = description
         self.id = "graph_" + str(uuid.uuid4())
         self.START = _StartNode(self.state)
@@ -196,7 +202,14 @@ class OrkesGraph:
             raise ValueError(f"Aggregation node '{aggregation_node}' does not exist.")
         aggregation_node_item = self._nodes_pool[aggregation_node]
 
-        
+        # Promote the node in place to an AggregationNode so the runner knows
+        # to offer it each branch's independent result. Mutating `.node`
+        # (rather than replacing the NodePoolItem) preserves identity for any
+        # edge that already references this NodePoolItem.
+        if not isinstance(aggregation_node_item.node, AggregationNode):
+            existing = aggregation_node_item.node
+            aggregation_node_item.node = AggregationNode(existing.name, existing.func, existing.graph_state)
+
         edge = ParallelEdge(from_node_item, to_node_items, aggregation_node_item, max_passes=max_passes)
         self._edges_pool.append(edge)
         self._nodes_pool[from_node_item.node.name].edge = edge
@@ -320,6 +333,20 @@ class OrkesGraph:
                             f"Validation failed: Parallel branch starting at '{to_node_name}' "
                             f"cannot reach the aggregation node '{aggregation_node_name}'."
                         )
+                agg_node = edge.aggregation_node.node
+                if isinstance(agg_node, AggregationNode) and not agg_node.accepts_branch_results:
+                    raise TypeError(
+                        f"Aggregation node '{agg_node.name}' must accept a `branch_results` "
+                        f"parameter: `def {agg_node.name}(state, branch_results): ...`. "
+                        f"A ParallelEdge forks state into independent copies per branch and "
+                        f"does not auto-merge them back -- without `branch_results`, the "
+                        f"aggregation node has no way to see what each branch produced, so "
+                        f"any of their state changes would be silently lost. You don't have "
+                        f"to use `branch_results` inside the function (e.g. `return state` "
+                        f"is fine if you're intentionally discarding branch output), but the "
+                        f"parameter must be declared so that choice is explicit rather than "
+                        f"accidental."
+                    )
             # TODO: Add checks for conditional edges.
             elif edge.edge_type == "__conditional__":
                 pass
@@ -332,7 +359,8 @@ class OrkesGraph:
                            graph_description=self.description,
                            nodes_pool=self._nodes_pool,
                            graph_type=self.state,
-                           traced=self.traced)
+                           traced=self.traced,
+                           trace_sinks=self.trace_sinks)
 
     def detect_loop(self):
         """Detects loops in the graph.
@@ -347,6 +375,11 @@ class OrkesGraph:
     def _walk_graph(self, current_node_item: NodePoolItem, path: set) -> bool:
         """Recursively walks the graph to detect loops.
 
+        Handles all edge types: a `ForwardEdge` has a single successor, while
+        `ConditionalEdge`/`ParallelEdge` have no static `to_node` (it's either
+        resolved at runtime or fanned out to multiple branches), so every
+        possible branch is explored.
+
         Args:
             current_node_item (NodePoolItem): The current node to visit.
             path (set): A set of visited node names in the current path.
@@ -356,14 +389,29 @@ class OrkesGraph:
         """
         current_node = current_node_item.node
         current_node_name = current_node.name
+        if isinstance(current_node, _EndNode):
+            return False
+
         # If the current node is already in the path, a loop is found.
         if current_node_name in path:
             return True  # Loop found
 
         path.add(current_node_name)
 
-        next_node_item = current_node_item.edge.to_node
-        if not isinstance(next_node_item.node, _EndNode):
+        edge = current_node_item.edge
+        next_node_items = []
+        if isinstance(edge, ForwardEdge):
+            next_node_items = [edge.to_node]
+        elif isinstance(edge, ConditionalEdge):
+            next_node_items = [
+                self._nodes_pool[target_name]
+                for target_name in edge.condition.values()
+                if target_name in self._nodes_pool
+            ]
+        elif isinstance(edge, ParallelEdge):
+            next_node_items = list(edge.to_nodes)
+
+        for next_node_item in next_node_items:
             if self._walk_graph(next_node_item, path):
                 return True
 

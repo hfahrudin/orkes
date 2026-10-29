@@ -1,13 +1,13 @@
-pydantic
 fastapi
 uvicorn
+requests
 python-dotenv
 pytest
 pytest-html
+pytest-asyncio
 memory-profiler
 psutil
 sphinxcontrib-mermaid
 sphinx-copybutton
-autodoc_pydantic
 pydata-sphinx-theme
 aiohttp

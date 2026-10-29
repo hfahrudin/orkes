@@ -1,7 +1,6 @@
-from typing import Optional, Dict, AsyncGenerator, Any, List, Union
+from typing import Optional, Dict, AsyncGenerator, List
 from abc import ABC, abstractmethod
 from requests import Response
-from pydantic import BaseModel
 from orkes.shared.schema import OrkesMessagesSchema, OrkesToolSchema, RequestSchema
 
 

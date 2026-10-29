@@ -14,7 +14,7 @@
   </a>
 </p>
 
-Orkes is a Python library for building, coordinating, and observing any complex workflow that can be represented as a graph. While it is well-suited for building LLM-powered agentic systems, its core focus is on providing a flexible and intuitive graph-based framework with an emphasis on explicit control flow, transparent logic, and comprehensive traceability.
+Orkes is a Python library for building, coordinating, and observing any complex workflow that can be represented as a graph. While it is well-suited for building LLM-powered agentic systems, its core focus is on providing a flexible and intuitive graph-based framework (inspired by NetworkX) with an emphasis on explicit control flow, transparent logic, and comprehensive traceability.
 
 
 ## Getting Started
@@ -136,6 +136,32 @@ At the heart of Orkes is a powerful graph-based architecture inspired by `Networ
 -   **Familiar Interface**: The graph-based interface is inspired by `NetworkX`, providing a familiar and powerful paradigm for those with experience in graph-based programming.
 
 
+## Sending Traces to Orkes Watcher
+
+[Orkes Watcher](https://github.com/hfahrudin/orkes-watcher) is a dashboard that shows your runs live and keeps their history. It works with a plain `pip install orkes`; attach a `WatcherSink` to your graph and nothing else in your code changes:
+
+```python
+from orkes.exporters.watcher import WatcherSink
+
+sink = WatcherSink(api_key="<project ingest key>", base_url="http://localhost:8000")
+graph = OrkesGraph(SearchState, name="search", trace_sinks=[sink])
+```
+
+`base_url` is the watcher backend (port `8000` by default), not the dashboard. Create one sink and reuse it for all your graphs and runs. Sending happens in a background thread, and a watcher that is down or rejects the data never affects your run: at most, a run waits up to 3 seconds at the end for its data to be sent.
+
+**State snapshots, prompts and LLM replies are sent as they are.** To leave out secrets or personal data, pass `redact`, a function that receives each event (and each node entry) as a dict and returns what should be sent:
+
+```python
+def redact(event):
+    if "state_snapshot" in event:
+        event = {**event, "state_snapshot": {"redacted": True}}
+    return event
+
+sink = WatcherSink(api_key=..., base_url=..., redact=redact)
+```
+
+Any object with `on_run_start`, `on_edge` and `on_run_end` methods can be a trace sink; see `orkes.exporters.TraceSink`.
+
 ## Benchmarks
 
 Orkes has been benchmarked against LangGraph on simple graph structures, demonstrating performance advantages. In direct comparisons of graphs with identical nodes and edges, Orkes consistently outperforms LangGraph in both latency and memory utilization.
@@ -175,7 +201,7 @@ python tests/benchmarks/run_all_benchmarks.py
 | ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------- |
 | Boilerplate Agent        | Provide a well-structured boilerplate for creating new agents to accelerate the development of agentic systems. | Planned |
 | Parallel Graph Execution | Enhance the graph runner to support parallel execution of independent branches for improved performance.        | Implemented |
-| Tracer Web Platform      | Develop a standalone web-based platform for visualizing and inspecting graph traces in real-time.               | Progressing |
+| Orkes Watcher Export     | Stream graph traces to Orkes Watcher, a separate web platform for inspecting runs live and across history.     | Progressing |
 
 ## Documentation
 For more details, visit our [Documentation Page](https://orkes.readthedocs.io/).

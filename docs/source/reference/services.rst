@@ -20,7 +20,6 @@ Clients
 .. autosummary::
    :toctree: ../api/
 
-   vLLMConnection
    UniversalLLMClient
    LLMFactory
 
