@@ -4,8 +4,7 @@ Attach them with `OrkesGraph(..., trace_sinks=[...])`. orkes calls each method
 at a fixed point of every run; a sink that raises is logged and skipped, so it
 can never break the run. Subclass `TraceSink` and override only what you need.
 
-`WatcherSink` (in `orkes.exporters.watcher`, extra `orkes[watcher]`) sends
-traces to Orkes Watcher.
+`WatcherSink` (in `orkes.exporters.watcher`) sends traces to Orkes Watcher.
 """
 from orkes.graph.schema import EdgeTrace, TracesSchema
 

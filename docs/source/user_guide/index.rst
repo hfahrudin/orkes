@@ -19,6 +19,7 @@ This guide is structured to be read sequentially, but feel free to jump to the s
    custom_llm_services
    tool_calling
    tracing
+   orkes_watcher
    best_practices
 
 Here is a brief overview of what you will find in this guide:
@@ -29,4 +30,5 @@ Here is a brief overview of what you will find in this guide:
 - **Connecting Custom LLMs**: Learn how to connect Orkes to any LLM service.
 - **Tool Calling**: A guide to have fine-grained control over how tools are defined and used.
 - **Orkes Tracer**: A guide to using the powerful tracing and visualization tools.
+- **Sending Traces to Watcher**: Stream runs to Orkes Watcher, a web dashboard for live runs and run history, and write your own trace sinks.
 - **Best Practices**: A collection of tips and recommendations for using Orkes effectively.

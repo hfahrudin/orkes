@@ -123,3 +123,113 @@ Orkes provides a visualization tool to inspect the flow and state changes during
     print("Graph visualization trace generated. Check your traces folder.")
 
 For a complete and runnable example, please refer to `tests/examples/graph_service_test.py`.
+
+7. Send Runs to Orkes Watcher
+-----------------------------
+To see runs live in `Orkes Watcher <https://github.com/hfahrudin/orkes-watcher>`__ and keep their history, attach a ``WatcherSink`` to the graph. The graph itself doesn't change.
+
+.. code-block:: python
+
+    from orkes.exporters.watcher import WatcherSink
+
+    sink = WatcherSink(api_key="<project ingest key>", base_url="http://localhost:8000")
+    graph = OrkesGraph(SearchState, name="search-example", trace_sinks=[sink])
+
+Below is the full search graph with a sink attached. It runs twice: once successfully, and once with a search that fails, so both cases show up in the dashboard. It also uses ``redact`` to keep the user's question out of the watcher. It needs no LLM or API key other than the watcher's.
+
+Save the code below as ``watcher_example.py`` and run it with your project's ingest key:
+
+.. code-block:: bash
+
+    ORKES_WATCHER_KEY=<project ingest key> python watcher_example.py
+
+.. code-block:: python
+
+    import os
+    import time
+    from typing import List, TypedDict
+
+    from orkes.graph.core import OrkesGraph
+    from orkes.exporters.watcher import WatcherSink
+
+
+    class SearchState(TypedDict):
+        user_query: str
+        search_queries: List[str]
+        current_index: int
+        raw_results: List[str]
+        final_answer: str
+
+
+    def planner(state: SearchState):
+        """Splits the question into search queries."""
+        return {"search_queries": [f"{state['user_query']} overview", f"{state['user_query']} comparison"],
+                "current_index": 0, "raw_results": []}
+
+
+    def search_step(state: SearchState):
+        """Runs the next search query."""
+        query = state["search_queries"][state["current_index"]]
+        time.sleep(0.3)  # stands in for a real search call
+        if "fail" in query:
+            raise ConnectionError(f"search service timed out for '{query}'")
+        return {"raw_results": state["raw_results"] + [f"results for '{query}'"],
+                "current_index": state["current_index"] + 1}
+
+
+    def has_more_queries(state: SearchState):
+        return "more" if state["current_index"] < len(state["search_queries"]) else "done"
+
+
+    def synthesizer(state: SearchState):
+        """Writes the final answer from the search results."""
+        return {"final_answer": f"Answer based on {len(state['raw_results'])} searches."}
+
+
+    def redact(event):
+        """Keeps the user's question out of the watcher."""
+        snapshot = event.get("state_snapshot")
+        if snapshot and "user_query" in snapshot:
+            event = {**event, "state_snapshot": {**snapshot, "user_query": "[redacted]"}}
+        return event
+
+
+    sink = WatcherSink(
+        api_key=os.environ["ORKES_WATCHER_KEY"],
+        base_url=os.environ.get("ORKES_WATCHER_URL", "http://localhost:8000"),
+        redact=redact,
+    )
+
+    graph = OrkesGraph(SearchState, name="search-example",
+                       description="Plans searches, runs them one by one, then answers.",
+                       trace_sinks=[sink])
+    graph.add_node("planner", planner)
+    graph.add_node("search_step", search_step)
+    graph.add_node("synthesizer", synthesizer)
+    graph.add_edge(graph.START, "planner")
+    graph.add_edge("planner", "search_step")
+    graph.add_conditional_edge("search_step", has_more_queries, {"more": "search_step", "done": "synthesizer"})
+    graph.add_edge("synthesizer", graph.END)
+    runner = graph.compile()
+
+
+    def empty_state(question: str) -> SearchState:
+        return {"user_query": question, "search_queries": [], "current_index": 0,
+                "raw_results": [], "final_answer": ""}
+
+
+    if __name__ == "__main__":
+        result = runner.run(empty_state("Orkes vs Temporal"))
+        print("finished:", result["final_answer"], "| run", runner.run_id)
+
+        try:
+            runner.run(empty_state("fail on purpose"))  # shows a failed run in the watcher
+        except ConnectionError as e:
+            print("failed:", e, "| run", runner.run_id)
+
+In the watcher, open **Traces** and filter by the graph ``search-example``:
+
+- The finished run shows the ``search_step`` loop (taken twice) and a state snapshot for each step.
+- The failed run shows ``failed in search_step`` with the ``ConnectionError`` and its traceback.
+
+See :ref:`orkes_watcher` for what is sent, how sending behaves, and how to write your own trace sink.

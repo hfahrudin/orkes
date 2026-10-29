@@ -101,11 +101,7 @@ At the heart of Orkes is a powerful graph-based architecture inspired by `Networ
 
 ## Sending Traces to Orkes Watcher
 
-[Orkes Watcher](https://github.com/hfahrudin/orkes-watcher) is a dashboard that shows your runs live and keeps their history. Install the extra and attach a `WatcherSink` to your graph; nothing else in your code changes:
-
-```bash
-pip install "orkes[watcher]"
-```
+[Orkes Watcher](https://github.com/hfahrudin/orkes-watcher) is a dashboard that shows your runs live and keeps their history. It works with a plain `pip install orkes`; attach a `WatcherSink` to your graph and nothing else in your code changes:
 
 ```python
 from orkes.exporters.watcher import WatcherSink

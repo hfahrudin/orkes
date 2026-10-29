@@ -20,8 +20,6 @@ Interface
 Orkes Watcher
 -------------
 
-Requires ``pip install "orkes[watcher]"``.
-
 .. currentmodule:: orkes.exporters.watcher
 
 .. autosummary::

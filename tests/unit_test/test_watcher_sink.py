@@ -626,14 +626,6 @@ def test_exit_flushes_edges_of_an_unfinished_run(fake_watcher):
     assert [(e["kind"], e["edge_run_number"]) for e in events] == [("edge", 1), ("edge", 2)]
 
 
-def test_import_without_requests_explains_the_extra(monkeypatch):
-    monkeypatch.setitem(sys.modules, "requests", None)
-    spec = importlib.util.spec_from_file_location("watcher_copy", watcher_module.__file__)
-    module = importlib.util.module_from_spec(spec)
-    with pytest.raises(ImportError, match=r"pip install 'orkes\[watcher\]'"):
-        spec.loader.exec_module(module)
-
-
 def test_watcher_schema_is_available_for_contract_checks():
     """Makes it visible when the cross-repo schema check above is not running."""
     if WATCHER_SCHEMA is None:

@@ -18,12 +18,7 @@ import time
 import weakref
 from typing import Callable, Dict, List, Optional
 
-try:
-    import requests
-except ImportError as e:  # pragma: no cover - depends on the environment
-    raise ImportError(
-        "WatcherSink needs the 'watcher' extra. Install it with: pip install 'orkes[watcher]'"
-    ) from e
+import requests
 
 from orkes.exporters import TraceSink
 from orkes.graph.schema import EdgeTrace, TracesSchema

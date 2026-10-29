@@ -38,6 +38,8 @@ You can install the latest stable version of the Orkes using pip:
 
     pip install orkes
 
+This includes everything needed to send traces to `Orkes Watcher <https://github.com/hfahrudin/orkes-watcher>`__; there is no separate extra to install.
+
 Verifying the Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 

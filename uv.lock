@@ -1834,7 +1834,7 @@ wheels = [
 
 [[package]]
 name = "orkes"
-version = "0.1.3.3"
+version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1865,9 +1865,6 @@ docs = [
     { name = "sphinx-copybutton" },
     { name = "sphinxcontrib-mermaid" },
 ]
-watcher = [
-    { name = "requests" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -1885,13 +1882,12 @@ requires-dist = [
     { name = "pytest-html", marker = "extra == 'dev'" },
     { name = "python-dotenv", marker = "extra == 'dev'" },
     { name = "requests" },
-    { name = "requests", marker = "extra == 'watcher'" },
     { name = "sphinx", marker = "extra == 'docs'" },
     { name = "sphinx-copybutton", marker = "extra == 'docs'" },
     { name = "sphinxcontrib-mermaid", marker = "extra == 'docs'" },
     { name = "uvicorn", marker = "extra == 'dev'" },
 ]
-provides-extras = ["watcher", "dev", "docs"]
+provides-extras = ["dev", "docs"]
 
 [[package]]
 name = "ormsgpack"

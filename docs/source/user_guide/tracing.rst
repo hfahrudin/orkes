@@ -50,6 +50,58 @@ A key feature of the Orkes tracer is its automatic capturing of LLM interactions
 
 This makes it easy to debug agentic behavior and understand why your LLM is making certain decisions.
 
+What a Trace Records
+--------------------
+
+Each run gets a fresh trace with its own ``run_id``, even when you call
+``run()`` many times on the same compiled graph.
+
+**For the run** (``TracesSchema``):
+
+- ``status``: ``FINISHED``, or ``FAILED`` if any node or gate raised.
+- ``start_time`` and ``elapsed_time``.
+- ``error``: for a failed run, ``"ExceptionType: message"`` followed by the
+  traceback. Capped at 8 KB by dropping the oldest frames, so the line that
+  raised is always kept.
+- ``failed_node``: the node that raised. Inside parallel branches this is the
+  node in the branch, not the node that split into branches.
+
+**For every edge traversal** (``EdgeTrace``):
+
+- ``from_node`` and ``to_node`` (a list for a parallel split).
+- ``started_at``: when the step started (Unix time, seconds).
+- ``elapsed``: how long the whole step took.
+- ``node_elapsed``: how long the node's own function took, without Orkes'
+  bookkeeping. ``0.0`` for ``START``, which runs no function.
+- ``state_snapshot``: a deep copy of the state *before* the node ran, so later
+  in-place changes don't alter it.
+- ``passes_left``: how many more times this edge may be taken before
+  ``max_passes`` stops the run.
+- ``llm_traces`` and ``function_traces``: the LLM calls and
+  ``@orkes_tracable`` functions made during this step only.
+- ``error``: set on the step that failed, so the failing edge appears in the
+  trace even though the run stopped there.
+
+Saving and Sending Traces
+-------------------------
+
+- ``runner.save_run_trace()`` writes the trace as JSON to
+  ``traces/trace_<run_id>.json``. Values JSON can't encode (``datetime``,
+  custom objects) are written as text instead of failing.
+- ``runner.visualize_trace()`` writes the interactive HTML view described
+  below.
+- **Trace sinks** receive the trace *while the run is happening*. Pass them
+  as ``OrkesGraph(..., trace_sinks=[...])``. ``WatcherSink`` sends runs to
+  Orkes Watcher, a web dashboard for live runs and run history; see
+  :ref:`orkes_watcher`.
+
+Turning Tracing Off
+-------------------
+
+``OrkesGraph(..., traced=False)`` skips all trace bookkeeping for the fastest
+possible runs. Trace sinks need tracing, so ``trace_sinks`` can't be combined
+with ``traced=False``.
+
 Visualizing Traces
 ------------------
 
