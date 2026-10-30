@@ -74,7 +74,7 @@ jobs:
         run: |
           gh release create "v$VERSION" dist/* \
             --target "$GITHUB_SHA" \
-            --title "v$VERSION" \
+            --title "orkes $VERSION" \
             --notes-file "changelogs/$VERSION.md"
 
       - name: Create release branch

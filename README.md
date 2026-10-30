@@ -160,11 +160,11 @@ python tests/benchmarks/run_all_benchmarks.py
 
 ## Roadmap
 
-| Feature                  | Description                                                                                                     | Status  |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------- |
-| Boilerplate Agent        | Provide a well-structured boilerplate for creating new agents to accelerate the development of agentic systems. | Planned |
-| Parallel Graph Execution | Enhance the graph runner to support parallel execution of independent branches for improved performance.        | Implemented |
-| Orkes Watcher Export     | Stream graph traces to Orkes Watcher, a separate web platform for inspecting runs live and across history.     | Progressing |
+| Feature                     | Description                                                                                                                                                                       | Status              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Pilot: Run Control          | Stop, pause and resume a running graph from Orkes Watcher. orkes checks for commands between nodes, never inside one, and a stopped run ends cleanly with its own status.         | Planned             |
+| Pilot: Human Feedback       | Let a node ask a person a question from Orkes Watcher (text, optional choices, timeout) and wait for the answer before continuing.                                                | Planned             |
+| Concurrent Branch Execution | Run the branches of a parallel split at the same time, as an opt-in for `arun()`. Today branches run one after another; for concurrent calls, use `asyncio.gather` inside a node. | Under consideration |
 
 ## Documentation
 For more details, visit our [Documentation Page](https://orkes.readthedocs.io/).

@@ -160,7 +160,8 @@ class GraphRunner:
             self.trace.start_time = time.time()
 
     def _end_run(self, error: Optional[BaseException]) -> None:
-        """Records the final status, error and elapsed time of a traced run."""
+        """Records the final status, state, error and elapsed time of a traced run."""
+        self.trace.final_state = _snapshot(self.graph_state)
         if error is None:
             self.trace.status = "FINISHED"
         else:

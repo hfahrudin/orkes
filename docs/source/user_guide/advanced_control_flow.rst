@@ -178,5 +178,17 @@ The aggregation node's function **must** accept a second parameter, ``branch_res
     # Edge from the aggregation node to the end
     graph.add_edge('aggregator', graph.END)
 
+.. tip::
+   Branches run one after another. To make several LLM or API calls at the same
+   time, run them concurrently inside a single async node and run the graph with
+   ``arun()``:
+
+   .. code-block:: python
+
+       async def ask_all(state):
+           a, b, c = await asyncio.gather(ask(model_1), ask(model_2), ask(model_3))
+           state["answers"] = [a, b, c]
+           return state
+
 .. note::
    If two branches write to the *same* state key, there is no automatic conflict resolution -- each branch's contribution only exists inside its own entry in ``branch_results`` until the aggregation node explicitly combines them (e.g. concatenating two lists, picking one, or voting). This is a deliberate design choice: silently picking a winner would make one branch's work vanish with no error and no trace.
