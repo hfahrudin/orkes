@@ -20,7 +20,7 @@ class TraceSink:
 
     def on_run_start(self, trace: TracesSchema) -> None:
         """A run started. `trace` has its run_id, graph name and node list,
-        and no edges yet."""
+        status "RUNNING", and no edges yet."""
 
     def on_edge(self, edge_trace: EdgeTrace) -> None:
         """An edge traversal finished (successfully or not) and was added to
@@ -28,7 +28,7 @@ class TraceSink:
 
     def on_run_end(self, trace: TracesSchema) -> None:
         """The run finished or failed. `trace` has its final status,
-        elapsed_time, error and failed_node."""
+        elapsed_time, error, failed_node and final_state."""
 
 
 __all__ = ["TraceSink"]

@@ -147,7 +147,8 @@ class TracesSchema:
         start_time (float): The Unix timestamp (in seconds) indicating when the
             execution started.
         elapsed_time (float): Total execution duration in seconds.
-        status (str): Final execution status (e.g., "SUCCESS", "FAILED").
+        status (str): "RUNNING" while the run is in progress, then
+            "FINISHED" or "FAILED".
         nodes_trace (list[NodeTrace]): Traces for all nodes executed during the run.
         edges_trace (list[EdgeTrace]): Traces for all edges traversed during the run.
         error (str | None): The exception that failed the run, as
@@ -155,14 +156,17 @@ class TracesSchema:
             8 KB), or None if it finished.
         failed_node (str | None): The source node of the edge in progress when
             the run failed, or None if it finished.
+        final_state (dict | None): The graph state when the run ended (the
+            run's output, or the state at the failure). None while running.
     """
     graph_name: str
     graph_description: str
     run_id: str
     start_time: float = 0.0
     elapsed_time: float = 0.0
-    status: str = "FAILED"
+    status: str = "RUNNING"
     nodes_trace: list[NodeTrace]
     edges_trace: list[EdgeTrace]
     error: Optional[str] = None
     failed_node: Optional[str] = None
+    final_state: Optional[dict] = None

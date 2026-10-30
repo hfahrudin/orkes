@@ -369,6 +369,39 @@ def test_arun_calls_on_run_end_off_the_event_loop():
     assert sink.threads["end"] != loop_thread
 
 
+def test_status_is_running_until_the_run_ends():
+    seen = {}
+
+    class StatusSink(TraceSink):
+        def on_run_start(self, trace):
+            seen["start"] = (trace.status, trace.final_state)
+
+        def on_run_end(self, trace):
+            seen["end"] = trace.status
+
+    _linear(StatusSink()).run({"n": 0, "data": {}})
+    assert seen == {"start": ("RUNNING", None), "end": "FINISHED"}
+
+
+@pytest.mark.parametrize("use_arun", [False, True])
+def test_final_state_is_the_run_output(use_arun):
+    sink = RecordingSink()
+    runner = _linear(sink)
+    state = {"n": 0, "data": {}}
+    result = asyncio.run(runner.arun(state)) if use_arun else runner.run(state)
+    assert runner.trace.final_state == {"n": 2, "data": {}}
+    result["data"]["changed"] = True  # a copy: later changes don't alter the trace
+    assert runner.trace.final_state == {"n": 2, "data": {}}
+
+
+def test_final_state_is_recorded_for_a_failed_run():
+    runner = _failing_graph("gate")  # node "a" runs, then its gate raises
+    with pytest.raises(ValueError):
+        runner.run({"n": 0, "data": {}})
+    assert runner.trace.status == "FAILED"
+    assert runner.trace.final_state == {"n": 1, "data": {}}
+
+
 def test_trace_sinks_need_tracing():
     with pytest.raises(ValueError, match="trace_sinks need tracing"):
         OrkesGraph(S, traced=False, trace_sinks=[RecordingSink()])

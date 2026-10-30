@@ -169,9 +169,10 @@ class OrkesGraph:
     def add_parallel_edges(self, from_node: Union[str, _StartNode], to_nodes: List[str], aggregation_node: str, max_passes: int = 25):
         """Adds a parallel edge that splits into multiple branches.
 
-        This creates parallel execution paths starting from each node in `to_nodes`.
-        It enforces that all parallel branches must be able to reach the specified
-        `aggregation_node`.
+        Creates one branch starting at each node in `to_nodes`. Each branch gets
+        its own deep copy of the state, and the branches run one after another
+        (not concurrently), under both `run()` and `arun()`. All branches must be
+        able to reach the specified `aggregation_node`.
 
         Args:
             from_node (Union[str, _StartNode]): The node from which the parallel branches originate.

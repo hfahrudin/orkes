@@ -58,13 +58,17 @@ Each run gets a fresh trace with its own ``run_id``, even when you call
 
 **For the run** (``TracesSchema``):
 
-- ``status``: ``FINISHED``, or ``FAILED`` if any node or gate raised.
+- ``status``: ``RUNNING`` while the run is in progress, then ``FINISHED``,
+  or ``FAILED`` if any node or gate raised.
 - ``start_time`` and ``elapsed_time``.
 - ``error``: for a failed run, ``"ExceptionType: message"`` followed by the
   traceback. Capped at 8 KB by dropping the oldest frames, so the line that
   raised is always kept.
 - ``failed_node``: the node that raised. Inside parallel branches this is the
   node in the branch, not the node that split into branches.
+- ``final_state``: a copy of the state when the run ended: the run's output,
+  or the state at the failure. Edge snapshots show the state *before* each
+  node, so this is the only place the last node's result appears.
 
 **For every edge traversal** (``EdgeTrace``):
 
